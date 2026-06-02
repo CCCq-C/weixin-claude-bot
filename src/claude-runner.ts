@@ -15,6 +15,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
+import { buildClaudeSpawnOptions } from "./claude-command.js";
 
 const SESSIONS_PATH = path.resolve("data/claude-sessions.json");
 const TIMEOUT_MS = 180_000;
@@ -81,14 +82,18 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
   }
 
   return new Promise((resolve) => {
-    const proc = spawn("claude", args, {
-      cwd: config.vaultPath,
-      env: process.env,
-    });
+    const proc = spawn(
+      config.claudeCommand,
+      args,
+      buildClaudeSpawnOptions({
+        vaultPath: config.vaultPath,
+        env: process.env,
+      }),
+    );
     let stdout = "";
     let stderr = "";
-    proc.stdout.on("data", (d: Buffer) => (stdout += d.toString("utf-8")));
-    proc.stderr.on("data", (d: Buffer) => (stderr += d.toString("utf-8")));
+    proc.stdout?.on("data", (d: Buffer) => (stdout += d.toString("utf-8")));
+    proc.stderr?.on("data", (d: Buffer) => (stderr += d.toString("utf-8")));
 
     const killer = setTimeout(() => {
       proc.kill("SIGKILL");

@@ -43,9 +43,12 @@
 ## 环境要求
 
 - macOS
+- Windows 10/11
 - Node.js 20+
 - Claude Code CLI 已安装并完成登录
 - 可以访问 `https://ilinkai.weixin.qq.com`
+
+Windows 原生模式建议安装 Git for Windows。Claude Code 官方也支持 WSL 路径；如果你已经习惯 WSL，可以在 WSL 里按 Linux/macOS 方式部署。
 
 检查：
 
@@ -106,6 +109,85 @@ npm start
 
 如果一切正常，Claude 会在 `VAULT_PATH` 下创建文件，并通过微信返回简短回执。
 
+## Windows 快速开始
+
+在 PowerShell 中运行：
+
+```powershell
+git clone https://github.com/CCCq-C/weixin-claude-bot.git
+cd weixin-claude-bot
+.\scripts\windows\check.ps1
+.\scripts\windows\setup.ps1
+```
+
+如果 PowerShell 阻止脚本执行，可以只在当前终端会话临时放行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+编辑 `.env`：
+
+```env
+VAULT_PATH="C:\Users\YourName\Documents\ObsidianVault"
+WHITELIST_USER_IDS=
+CLAUDE_MODEL=
+CLAUDE_COMMAND=
+```
+
+然后扫码登录：
+
+```powershell
+npm run login
+```
+
+把终端显示的 `userId` 写入 `.env`：
+
+```env
+WHITELIST_USER_IDS="xxx@im.wechat"
+```
+
+启动：
+
+```powershell
+npm start
+```
+
+如果 Windows 找不到 `claude`，但 `claude.cmd` 存在，可以在 `.env` 里指定：
+
+```env
+CLAUDE_COMMAND=claude.cmd
+```
+
+Windows 开机自启建议使用任务计划程序：
+
+```powershell
+.\scripts\windows\install-startup-task.ps1
+```
+
+### Windows 覆盖范围
+
+当前 Windows 支持按 `v0.2.0-beta.1` 处理，适合社区共测。
+
+已覆盖：
+
+- Windows 10/11 原生 PowerShell 部署
+- Node.js 20+ / npm 环境检查
+- Git for Windows 环境检查
+- Claude Code CLI 存在性和登录状态检查
+- npm 安装的 `claude.cmd` 解析
+- `CLAUDE_COMMAND` 自定义 Claude 命令
+- Windows 风格 `VAULT_PATH`
+- 任务计划程序开机自启
+
+仍需用户环境配合：
+
+- Claude Code CLI 必须已经安装并登录
+- 网络必须能访问 `ilinkai.weixin.qq.com`
+- `VAULT_PATH` 必须是真实存在且可写的目录
+- 公司代理、杀毒软件、受限 PowerShell 策略可能需要用户手动处理
+- WSL 用户不要混用 Windows 路径和 WSL 路径；请在同一个环境内完成 Node、Claude CLI、Vault 配置
+
 ## 给 AI 助手的部署规划
 
 如果你让 Claude Code、Codex、Cursor 或其他 AI 编程助手帮你部署，请直接让它阅读本节，并按阶段执行。不要跳过验收。
@@ -120,6 +202,12 @@ npm -v
 which claude && claude --version
 claude -p "ping" --output-format json
 curl -sI https://ilinkai.weixin.qq.com | head -1
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\windows\check.ps1
 ```
 
 通过标准：
@@ -141,12 +229,28 @@ npm install
 cp .env.example .env
 ```
 
+Windows PowerShell：
+
+```powershell
+.\scripts\windows\setup.ps1
+```
+
 编辑 `.env`：
 
 ```bash
 VAULT_PATH="/absolute/path/to/your/obsidian-vault"
 WHITELIST_USER_IDS=
 CLAUDE_MODEL=
+CLAUDE_COMMAND=
+```
+
+Windows 示例：
+
+```env
+VAULT_PATH="C:\Users\YourName\Documents\ObsidianVault"
+WHITELIST_USER_IDS=
+CLAUDE_MODEL=
+CLAUDE_COMMAND=
 ```
 
 通过标准：
@@ -227,11 +331,18 @@ pm2 save
 pm2 startup
 ```
 
+Windows 推荐使用任务计划程序：
+
+```powershell
+.\scripts\windows\install-startup-task.ps1
+```
+
 ### AI 助手注意事项
 
 - 不要提交或打印 `.env`、`data/account.json`、`data/claude-sessions.json`。
 - 不要把 `WHITELIST_USER_IDS` 留空后强行启动。
 - 不要把 `VAULT_PATH` 指向整个用户主目录，优先使用单独的 Obsidian Vault 或测试目录。
+- Windows 原生部署优先用 PowerShell；WSL 用户请在 WSL 内保持 Node、Claude CLI、Vault 路径都属于同一个环境。
 - 每完成一个阶段，都要检查通过标准，再进入下一阶段。
 - 出错时先看终端输出和 `pm2 logs weixin-claude-bot`，不要直接重装。
 
@@ -274,6 +385,7 @@ data/                # runtime state, ignored by git
 ## 开发
 
 ```bash
+npm test
 npm run typecheck
 ```
 
