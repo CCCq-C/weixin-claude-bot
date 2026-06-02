@@ -1,6 +1,6 @@
 {
   "name": "weixin-claude-bot",
-  "version": "0.2.0-beta.1",
+  "version": "0.3.0-beta.1",
   "description": "用微信驱动本地 Claude CLI 操作 Obsidian 仓库",
   "type": "module",
   "private": true,

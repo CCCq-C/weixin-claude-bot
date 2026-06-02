@@ -109,6 +109,27 @@ npm start
 
 如果一切正常，Claude 会在 `VAULT_PATH` 下创建文件，并通过微信返回简短回执。
 
+## 微信内置命令
+
+这些命令可以直接发给微信里的 bot：
+
+```text
+/help      查看命令帮助
+/status    查看当前是否有任务正在执行
+/stop      中断当前任务
+/cancel    同 /stop
+/中断       同 /stop
+/停止       同 /stop
+/reset     清除当前用户的 Claude 会话上下文
+```
+
+安全规则：
+
+- 同一个微信用户同一时间只允许一个 Claude 任务。
+- 当前任务执行中时，新普通消息不会启动第二个 Claude 进程。
+- 需要中断时发送 `/stop`、`/cancel`、`/中断` 或 `/停止`。
+- `/reset` 只清除会话上下文，不会删除你的笔记或文件。
+
 ## Windows 快速开始
 
 在 PowerShell 中运行：
@@ -167,7 +188,7 @@ Windows 开机自启建议使用任务计划程序：
 
 ### Windows 覆盖范围
 
-当前 Windows 支持按 `v0.2.0-beta.1` 处理，适合社区共测。
+当前 Windows 支持按 `v0.3.0-beta.1` 处理，适合社区共测。
 
 已覆盖：
 
@@ -179,6 +200,7 @@ Windows 开机自启建议使用任务计划程序：
 - `CLAUDE_COMMAND` 自定义 Claude 命令
 - Windows 风格 `VAULT_PATH`
 - 任务计划程序开机自启
+- 微信内置 `/stop` 中断命令和同用户防并发
 
 仍需用户环境配合：
 

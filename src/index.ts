@@ -8,7 +8,13 @@ import { config, assertConfig } from "./config.js";
 import { login, loadAccount } from "./login.js";
 import { pollUpdates } from "./poll.js";
 import { sendText, extractText } from "./reply.js";
-import { runClaude } from "./claude-runner.js";
+import {
+  cancelClaude,
+  getClaudeTaskStatus,
+  resetSession,
+  runClaude,
+} from "./claude-runner.js";
+import { helpText, parseBotCommand } from "./bot-commands.js";
 
 const WECHAT_CHUNK = 3500; // 单条文本上限保守值
 
@@ -69,6 +75,42 @@ async function main(): Promise<void> {
 
     console.log(`[recv] ${from}: ${text}`);
 
+    const command = parseBotCommand(text);
+    if (command) {
+      let reply: string;
+      if (command.type === "stop") {
+        reply = cancelClaude(from) ? "已中断当前任务。" : "当前没有正在执行的任务。";
+      } else if (command.type === "status") {
+        reply = getClaudeTaskStatus(from);
+      } else if (command.type === "reset") {
+        resetSession(from);
+        reply = "已清除当前 Claude 会话。";
+      } else {
+        reply = helpText();
+      }
+      try {
+        await sendText(account.baseUrl, account.botToken, from, reply, ctx);
+      } catch (e: unknown) {
+        console.error(`[send] 命令回复失败: ${e instanceof Error ? e.message : e}`);
+      }
+      continue;
+    }
+
+    if (getClaudeTaskStatus(from) !== "当前没有正在执行的任务。") {
+      try {
+        await sendText(
+          account.baseUrl,
+          account.botToken,
+          from,
+          "当前任务正在执行，请发送 /status 查看状态，或发送 /stop 中断。",
+          ctx,
+        );
+      } catch (e: unknown) {
+        console.error(`[send] 忙碌提示失败: ${e instanceof Error ? e.message : e}`);
+      }
+      continue;
+    }
+
     // 1. 立即回执，避免用户长时间等待无反馈
     try {
       await sendText(account.baseUrl, account.botToken, from, "🤔 收到，正在处理...", ctx);
@@ -76,29 +118,32 @@ async function main(): Promise<void> {
       console.error(`[send] 回执失败: ${e instanceof Error ? e.message : e}`);
     }
 
-    // 2. 调 Claude（最多 180s）
-    const t0 = Date.now();
-    let result: string;
-    try {
-      result = await runClaude(text, from);
-    } catch (e: unknown) {
-      result = `[runClaude 异常] ${e instanceof Error ? e.message : String(e)}`;
-    }
-    const elapsed = Math.round((Date.now() - t0) / 1000);
-    console.log(`[claude] ${elapsed}s, ${result.length} chars`);
-
-    // 3. 切片回复
-    const chunks = splitForWechat(result);
-    for (let i = 0; i < chunks.length; i++) {
-      const piece = chunks.length > 1 ? `(${i + 1}/${chunks.length})\n${chunks[i]}` : chunks[i]!;
+    void (async () => {
+      // 2. 调 Claude（最多 180s）
+      const t0 = Date.now();
+      let result: string;
       try {
-        await sendText(account.baseUrl, account.botToken, from, piece, ctx);
+        result = await runClaude(text, from);
       } catch (e: unknown) {
-        console.error(`[send] 第 ${i + 1} 片失败: ${e instanceof Error ? e.message : e}`);
-        break;
+        result = `[runClaude 异常] ${e instanceof Error ? e.message : String(e)}`;
       }
-    }
-    console.log(`[send] → ${chunks.length} 片回复完毕`);
+      const elapsed = Math.round((Date.now() - t0) / 1000);
+      console.log(`[claude] ${elapsed}s, ${result.length} chars`);
+
+      // 3. 切片回复
+      const chunks = splitForWechat(result);
+      for (let i = 0; i < chunks.length; i++) {
+        const piece =
+          chunks.length > 1 ? `(${i + 1}/${chunks.length})\n${chunks[i]}` : chunks[i]!;
+        try {
+          await sendText(account.baseUrl, account.botToken, from, piece, ctx);
+        } catch (e: unknown) {
+          console.error(`[send] 第 ${i + 1} 片失败: ${e instanceof Error ? e.message : e}`);
+          break;
+        }
+      }
+      console.log(`[send] → ${chunks.length} 片回复完毕`);
+    })();
   }
 }
 

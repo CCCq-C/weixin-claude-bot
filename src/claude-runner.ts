@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
 import { buildClaudeSpawnOptions } from "./claude-command.js";
+import { taskManager } from "./task-manager.js";
 
 const SESSIONS_PATH = path.resolve("data/claude-sessions.json");
 const TIMEOUT_MS = 180_000;
@@ -60,6 +61,10 @@ type ClaudeJsonOutput = {
 };
 
 export async function runClaude(prompt: string, userId: string): Promise<string> {
+  if (taskManager.has(userId)) {
+    return "当前已有任务正在执行，请等待完成，或发送 /stop 中断当前任务。";
+  }
+
   const sessions = loadSessions();
   // bypassPermissions：跳过所有权限弹窗
   // 安全护栏：上层 index.ts 已用 WHITELIST_USER_IDS 限定为 bot 主人自己；
@@ -90,6 +95,11 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
         env: process.env,
       }),
     );
+    if (!taskManager.register(userId, proc)) {
+      proc.kill("SIGTERM");
+      resolve("当前已有任务正在执行，请等待完成，或发送 /stop 中断当前任务。");
+      return;
+    }
     let stdout = "";
     let stderr = "";
     proc.stdout?.on("data", (d: Buffer) => (stdout += d.toString("utf-8")));
@@ -101,6 +111,10 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
 
     proc.on("close", (code) => {
       clearTimeout(killer);
+      if (code === null) {
+        resolve("任务已中断。");
+        return;
+      }
 
       if (code !== 0) {
         resolve(
@@ -135,6 +149,14 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
       resolve(`[启动 claude 失败] ${e.message}`);
     });
   });
+}
+
+export function cancelClaude(userId: string): boolean {
+  return taskManager.cancel(userId);
+}
+
+export function getClaudeTaskStatus(userId: string): string {
+  return taskManager.status(userId);
 }
 
 /** 重置某个用户的会话（M4 才会用，预留 export） */
