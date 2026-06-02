@@ -106,6 +106,135 @@ npm start
 
 如果一切正常，Claude 会在 `VAULT_PATH` 下创建文件，并通过微信返回简短回执。
 
+## 给 AI 助手的部署规划
+
+如果你让 Claude Code、Codex、Cursor 或其他 AI 编程助手帮你部署，请直接让它阅读本节，并按阶段执行。不要跳过验收。
+
+### M0：环境检查
+
+目标：确认本机已经具备运行条件。
+
+```bash
+node -v
+npm -v
+which claude && claude --version
+claude -p "ping" --output-format json
+curl -sI https://ilinkai.weixin.qq.com | head -1
+```
+
+通过标准：
+
+- Node.js 版本为 20 或更高
+- `claude --version` 能正常输出
+- `claude -p "ping" --output-format json` 能正常返回，说明 Claude Code CLI 已完成登录
+- `curl` 能访问 `ilinkai.weixin.qq.com`
+- 已确认一个可写的 `VAULT_PATH`
+
+如果 `claude` 不存在，先安装并登录 Claude Code CLI，再继续。
+
+### M1：初始化项目
+
+目标：安装依赖并写好 `.env`。
+
+```bash
+npm install
+cp .env.example .env
+```
+
+编辑 `.env`：
+
+```bash
+VAULT_PATH="/absolute/path/to/your/obsidian-vault"
+WHITELIST_USER_IDS=
+CLAUDE_MODEL=
+```
+
+通过标准：
+
+- `npm install` 无报错
+- `.env` 存在
+- `VAULT_PATH` 是绝对路径，且目录真实存在、可写
+
+### M2：微信扫码登录
+
+目标：拿到本机微信 bot 登录状态。
+
+```bash
+npm run login
+```
+
+操作：
+
+- 用手机微信扫描终端里的二维码
+- 如果终端二维码扫不上，就把终端打印的 URL 在浏览器打开再扫码
+- 手机端确认登录
+
+通过标准：
+
+- 终端显示登录成功
+- `data/account.json` 被创建
+- 终端输出一个类似 `xxx@im.wechat` 的 `userId`
+
+然后把这个 `userId` 写回 `.env`：
+
+```bash
+WHITELIST_USER_IDS="xxx@im.wechat"
+```
+
+### M3：端到端验证
+
+目标：确认微信消息能驱动 Claude 写入本地目录。
+
+```bash
+npm start
+```
+
+在微信里给 bot 发送：
+
+```text
+在 临时输出/test.md 写一行 hello
+```
+
+通过标准：
+
+- 终端出现 `[recv]`
+- 终端出现 `[claude]`
+- 微信收到简短回执
+- `VAULT_PATH/临时输出/test.md` 真实存在
+
+如果 `WHITELIST_USER_IDS` 为空，程序会拒绝进入长轮询。这是安全设计，不是 bug。
+
+### M4：常驻运行
+
+目标：让 bot 在后台运行。
+
+```bash
+npm install -g pm2
+pm2 start ecosystem.config.cjs
+pm2 logs weixin-claude-bot
+```
+
+通过标准：
+
+- `pm2 list` 里 `weixin-claude-bot` 状态为 `online`
+- `pm2 logs weixin-claude-bot` 里能看到长轮询启动
+- 微信再次发消息仍能触发 Claude
+
+确认稳定后再执行：
+
+```bash
+pm2 save
+pm2 startup
+```
+
+### AI 助手注意事项
+
+- 不要提交或打印 `.env`、`data/account.json`、`data/claude-sessions.json`。
+- 不要把 `WHITELIST_USER_IDS` 留空后强行启动。
+- 不要把 `VAULT_PATH` 指向整个用户主目录，优先使用单独的 Obsidian Vault 或测试目录。
+- 每完成一个阶段，都要检查通过标准，再进入下一阶段。
+- 出错时先看终端输出和 `pm2 logs weixin-claude-bot`，不要直接重装。
+
 ## pm2 常驻
 
 ```bash
