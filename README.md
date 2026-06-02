@@ -166,3 +166,9 @@ npm run typecheck
 ## 免责声明
 
 这是一个研究和个人自动化项目。微信、Claude Code CLI 或 ilinkai 协议的变化都可能导致项目不可用。请自行评估账号、数据和权限风险。
+
+## 开源协议
+
+本项目使用 MIT License 开源。你可以自由使用、复制、修改、分发和商用本项目，但需要保留原始版权声明和协议文本。
+
+This project is open-sourced under the MIT License. You may use, copy, modify, distribute, and use it commercially, as long as the original copyright notice and license text are preserved.
