@@ -3,7 +3,7 @@
  *
  * 流程：
  *   1. GET /ilink/bot/get_bot_qrcode  → 拿 qrcode + qrcode_img_content
- *   2. 终端打印 ASCII 二维码 + URL
+ *   2. 生成本地浏览器扫码页 + 终端打印 ASCII 二维码
  *   3. LOOP: GET /ilink/bot/get_qrcode_status (长轮询)
  *      - "wait"               → 继续轮询
  *      - "scaned"             → 已扫，等用户在手机上点确认
@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import qrcode from "qrcode-terminal";
+import { createLoginQrPage, openLoginQrPage } from "./login-qr-page.js";
 
 const BASE_URL = "https://ilinkai.weixin.qq.com";
 const APP_ID = "bot";
@@ -96,14 +97,21 @@ function saveAccount(account: Account): void {
 export async function login(): Promise<Account> {
   console.log("→ 正在向 ilinkai 申请二维码 ...");
   const qr = await fetchQRCode();
+  const qrPage = await createLoginQrPage(qr.qrcode_img_content);
 
   console.log("\n┌──────────────────────────────────────────────────────");
-  console.log("│ 请用手机微信扫一扫下方二维码：");
-  console.log("│ 扫不上的话，把下面这个 URL 在浏览器打开（macOS 一行命令）：");
-  console.log(`│   open '${qr.qrcode_img_content}'`);
+  console.log("│ 请用手机微信扫描浏览器中的二维码：");
+  console.log(`│   ${qrPage.fileUrl}`);
+  console.log("│ 已尝试自动打开浏览器；如果没弹出，请手动点击上面的链接。");
   console.log("└──────────────────────────────────────────────────────\n");
 
-  // 终端绘制 QR（small 模式比较紧凑）
+  try {
+    openLoginQrPage(qrPage.fileUrl);
+  } catch (e: unknown) {
+    console.log(`浏览器自动打开失败，请手动打开上面的链接：${String(e)}`);
+  }
+
+  // 终端绘制 QR，给普通终端用户保留兜底入口。
   qrcode.generate(qr.qrcode_img_content, { small: true });
 
   console.log("\n等待扫码 + 手机确认（最多 5 分钟）...");
