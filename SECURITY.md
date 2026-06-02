@@ -16,6 +16,8 @@ This bot can run Claude Code CLI with `--permission-mode bypassPermissions`.
 Only use it with a strict `WHITELIST_USER_IDS` value and a carefully chosen
 `VAULT_PATH`.
 
+The bot refuses to start message polling when `WHITELIST_USER_IDS` is empty.
+
 If you suspect the bot is receiving unexpected messages, stop it immediately:
 
 ```bash

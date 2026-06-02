@@ -36,11 +36,13 @@ async function main(): Promise<void> {
 
   console.log(`✓ 账号已加载  userId=${account.userId}`);
   console.log(`✓ baseUrl     ${account.baseUrl}`);
-  console.log(
-    `✓ 白名单      ${
-      config.whitelistUserIds.length > 0 ? config.whitelistUserIds.join(", ") : "(空 → 所有人)"
-    }`,
-  );
+  if (config.whitelistUserIds.length === 0) {
+    console.error("\n⚠️  WHITELIST_USER_IDS 为空，bot 不会启动。");
+    console.error("请先把自己的 userId 写入 .env，例如：");
+    console.error(`  WHITELIST_USER_IDS="${account.userId}"\n`);
+    return;
+  }
+  console.log(`✓ 白名单      ${config.whitelistUserIds.join(", ")}`);
   console.log(`✓ 仓库路径    ${config.vaultPath}`);
   console.log("\n→ 长轮询启动，给手机 'AI Bot' 发一句话试试 ...\n");
 

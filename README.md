@@ -90,6 +90,8 @@ data/account.json
 WHITELIST_USER_IDS="your-user-id@im.wechat"
 ```
 
+出于安全原因，`WHITELIST_USER_IDS` 为空时 bot 不会进入长轮询，也不会响应任何微信消息。
+
 重新启动：
 
 ```bash
