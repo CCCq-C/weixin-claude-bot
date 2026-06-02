@@ -130,6 +130,24 @@ npm start
 - 需要中断时发送 `/stop`、`/cancel`、`/中断` 或 `/停止`。
 - `/reset` 只清除会话上下文，不会删除你的笔记或文件。
 
+## Agent 能力边界
+
+当前默认 Agent 是 Claude Code CLI。项目内部已经保留轻量能力层，用来区分：
+
+```text
+文本能力
+视觉能力
+本地文件读取能力
+音频能力
+```
+
+这不是要把项目改成通用 SDK，而是为后续接 DeepSeek、Kimi、Codex 或附件预处理做准备。原则是：
+
+- 文本模型只接收文本、OCR 结果或 Markdown。
+- 支持本地文件读取的 Agent 才能收到附件路径。
+- 不假设所有 Agent 都能看图、读 PDF、处理音频。
+- 附件能力上线前，图片/文件不会被硬塞给不支持的模型。
+
 ## Windows 快速开始
 
 在 PowerShell 中运行：
@@ -188,7 +206,7 @@ Windows 开机自启建议使用任务计划程序：
 
 ### Windows 覆盖范围
 
-当前 Windows 支持按 `v0.3.0-beta.1` 处理，适合社区共测。
+当前 Windows 支持按 `v0.4.0-beta.1` 处理，适合社区共测。
 
 已覆盖：
 
@@ -201,6 +219,9 @@ Windows 开机自启建议使用任务计划程序：
 - Windows 风格 `VAULT_PATH`
 - 任务计划程序开机自启
 - 微信内置 `/stop` 中断命令和同用户防并发
+- 跨平台 `npm run doctor` 诊断
+- 运行状态文件 `data/status.json`
+- 事件日志 `data/events.log`
 
 仍需用户环境配合：
 
@@ -407,6 +428,7 @@ data/                # runtime state, ignored by git
 ## 开发
 
 ```bash
+npm run doctor
 npm test
 npm run typecheck
 ```

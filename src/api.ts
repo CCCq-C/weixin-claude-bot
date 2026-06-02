@@ -3,6 +3,7 @@
  * 协议参考：02-协议拆解笔记.md §3 Headers
  */
 import crypto from "node:crypto";
+import { AuthExpiredError, isAuthExpiredPayload } from "./auth-errors.js";
 
 const APP_ID = "bot";
 const CLIENT_VERSION = "66049";
@@ -44,6 +45,9 @@ export async function postSigned<T>(
   });
   if (!res.ok) {
     const txt = await res.text();
+    if (res.status === 401 || res.status === 403 || isAuthExpiredPayload({ message: txt })) {
+      throw new AuthExpiredError(`POST ${pathname} ${res.status}: ${txt.slice(0, 300)}`);
+    }
     throw new Error(`POST ${pathname} ${res.status}: ${txt}`);
   }
   const txt = await res.text();
@@ -51,8 +55,15 @@ export async function postSigned<T>(
     console.error(`[api] POST ${pathname} ← ${txt.slice(0, 500)}`);
   }
   try {
-    return JSON.parse(txt) as T;
+    const parsed = JSON.parse(txt) as T;
+    if (isAuthExpiredPayload(parsed)) {
+      throw new AuthExpiredError(`POST ${pathname}: ${txt.slice(0, 300)}`);
+    }
+    return parsed;
   } catch {
+    if (isAuthExpiredPayload({ message: txt })) {
+      throw new AuthExpiredError(`POST ${pathname}: ${txt.slice(0, 300)}`);
+    }
     throw new Error(`POST ${pathname} 返回非 JSON: ${txt.slice(0, 300)}`);
   }
 }

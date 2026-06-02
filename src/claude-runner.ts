@@ -17,6 +17,7 @@ import path from "node:path";
 import { config } from "./config.js";
 import { buildClaudeSpawnOptions } from "./claude-command.js";
 import { taskManager } from "./task-manager.js";
+import { buildAgentInput, CLAUDE_CODE_CAPABILITIES } from "./agent-capabilities.js";
 
 const SESSIONS_PATH = path.resolve("data/claude-sessions.json");
 const TIMEOUT_MS = 180_000;
@@ -66,12 +67,16 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
   }
 
   const sessions = loadSessions();
+  const agentPrompt = buildAgentInput({
+    userText: prompt,
+    capabilities: CLAUDE_CODE_CAPABILITIES,
+  });
   // bypassPermissions：跳过所有权限弹窗
   // 安全护栏：上层 index.ts 已用 WHITELIST_USER_IDS 限定为 bot 主人自己；
   // 没有白名单的人发的消息根本进不到这里。
   const args = [
     "-p",
-    prompt,
+    agentPrompt,
     "--output-format",
     "json",
     "--permission-mode",

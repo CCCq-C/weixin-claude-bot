@@ -15,6 +15,7 @@ import {
   runClaude,
 } from "./claude-runner.js";
 import { helpText, parseBotCommand } from "./bot-commands.js";
+import { appendEvent, updateStatus } from "./runtime-state.js";
 
 const WECHAT_CHUNK = 3500; // 单条文本上限保守值
 
@@ -39,6 +40,18 @@ async function main(): Promise<void> {
     console.log("  2. 重新运行 npm start，bot 进入回声模式\n");
     return;
   }
+
+  updateStatus("data", {
+    wechatAccountLoaded: true,
+    whitelistConfigured: config.whitelistUserIds.length > 0,
+    vaultPath: config.vaultPath,
+    claudeCommand: config.claudeCommand,
+    currentTask: "idle",
+  });
+  appendEvent("data", "bot-started", {
+    userId: account.userId,
+    vaultPath: config.vaultPath,
+  });
 
   console.log(`✓ 账号已加载  userId=${account.userId}`);
   console.log(`✓ baseUrl     ${account.baseUrl}`);
@@ -66,27 +79,35 @@ async function main(): Promise<void> {
       !config.whitelistUserIds.includes(from)
     ) {
       console.log(`[skip] 非白名单: ${from}`);
+      appendEvent("data", "message-skipped", { from, reason: "not-whitelisted" });
       continue;
     }
     if (!text) {
       console.log(`[skip] 非文本/语音 (item_type=${msg.item_list?.[0]?.type})`);
+      appendEvent("data", "message-skipped", { from, reason: "unsupported-message" });
       continue;
     }
 
     console.log(`[recv] ${from}: ${text}`);
+    updateStatus("data", { lastMessageAt: new Date().toISOString() });
+    appendEvent("data", "message-received", { from });
 
     const command = parseBotCommand(text);
     if (command) {
       let reply: string;
       if (command.type === "stop") {
         reply = cancelClaude(from) ? "已中断当前任务。" : "当前没有正在执行的任务。";
+        appendEvent("data", "command-stop", { from, reply });
       } else if (command.type === "status") {
         reply = getClaudeTaskStatus(from);
+        appendEvent("data", "command-status", { from });
       } else if (command.type === "reset") {
         resetSession(from);
         reply = "已清除当前 Claude 会话。";
+        appendEvent("data", "command-reset", { from });
       } else {
         reply = helpText();
+        appendEvent("data", "command-help", { from });
       }
       try {
         await sendText(account.baseUrl, account.botToken, from, reply, ctx);
@@ -119,6 +140,8 @@ async function main(): Promise<void> {
     }
 
     void (async () => {
+      updateStatus("data", { currentTask: "running" });
+      appendEvent("data", "task-started", { from });
       // 2. 调 Claude（最多 180s）
       const t0 = Date.now();
       let result: string;
@@ -126,6 +149,9 @@ async function main(): Promise<void> {
         result = await runClaude(text, from);
       } catch (e: unknown) {
         result = `[runClaude 异常] ${e instanceof Error ? e.message : String(e)}`;
+        updateStatus("data", {
+          lastError: e instanceof Error ? e.message : String(e),
+        });
       }
       const elapsed = Math.round((Date.now() - t0) / 1000);
       console.log(`[claude] ${elapsed}s, ${result.length} chars`);
@@ -143,6 +169,8 @@ async function main(): Promise<void> {
         }
       }
       console.log(`[send] → ${chunks.length} 片回复完毕`);
+      updateStatus("data", { currentTask: "idle" });
+      appendEvent("data", "task-finished", { from, elapsedSeconds: elapsed });
     })();
   }
 }
