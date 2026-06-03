@@ -16,6 +16,10 @@ import {
 } from "./claude-runner.js";
 import { helpText, parseBotCommand } from "./bot-commands.js";
 import { appendEvent, updateStatus } from "./runtime-state.js";
+import {
+  buildTaskFinishedMessage,
+  buildTaskStartedMessage,
+} from "./wechat-task-messages.js";
 
 const WECHAT_CHUNK = 3500; // 单条文本上限保守值
 
@@ -134,7 +138,7 @@ async function main(): Promise<void> {
 
     // 1. 立即回执，避免用户长时间等待无反馈
     try {
-      await sendText(account.baseUrl, account.botToken, from, "🤔 收到，正在处理...", ctx);
+      await sendText(account.baseUrl, account.botToken, from, buildTaskStartedMessage(), ctx);
     } catch (e: unknown) {
       console.error(`[send] 回执失败: ${e instanceof Error ? e.message : e}`);
     }
@@ -158,17 +162,32 @@ async function main(): Promise<void> {
 
       // 3. 切片回复
       const chunks = splitForWechat(result);
+      let resultDelivered = true;
+      let deliveredChunks = 0;
       for (let i = 0; i < chunks.length; i++) {
         const piece =
           chunks.length > 1 ? `(${i + 1}/${chunks.length})\n${chunks[i]}` : chunks[i]!;
         try {
           await sendText(account.baseUrl, account.botToken, from, piece, ctx);
+          deliveredChunks += 1;
         } catch (e: unknown) {
           console.error(`[send] 第 ${i + 1} 片失败: ${e instanceof Error ? e.message : e}`);
+          resultDelivered = false;
           break;
         }
       }
-      console.log(`[send] → ${chunks.length} 片回复完毕`);
+      try {
+        await sendText(
+          account.baseUrl,
+          account.botToken,
+          from,
+          buildTaskFinishedMessage(elapsed, { resultDelivered }),
+          ctx,
+        );
+      } catch (e: unknown) {
+        console.error(`[send] 结束语失败: ${e instanceof Error ? e.message : e}`);
+      }
+      console.log(`[send] → ${deliveredChunks}/${chunks.length} 片回复完毕`);
       updateStatus("data", { currentTask: "idle" });
       appendEvent("data", "task-finished", { from, elapsedSeconds: elapsed });
     })();
