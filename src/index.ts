@@ -20,6 +20,7 @@ import {
   buildTaskFinishedMessage,
   buildTaskStartedMessage,
 } from "./wechat-task-messages.js";
+import { acquireInstanceLock } from "./instance-lock.js";
 
 const WECHAT_CHUNK = 3500; // 单条文本上限保守值
 
@@ -33,6 +34,24 @@ function splitForWechat(s: string, n: number = WECHAT_CHUNK): string[] {
 async function main(): Promise<void> {
   console.log("================ weixin-claude-bot ================");
   assertConfig();
+
+  const lock = acquireInstanceLock("data");
+  if (!lock.acquired) {
+    console.error(`\n❌ ${lock.message}`);
+    console.error(`锁文件: ${lock.path}`);
+    console.error("如果确认没有 bot 在运行，可以删除这个锁文件后再启动。");
+    process.exit(1);
+  }
+  const releaseLock = (): void => lock.release();
+  process.once("exit", releaseLock);
+  process.once("SIGINT", () => {
+    releaseLock();
+    process.exit(130);
+  });
+  process.once("SIGTERM", () => {
+    releaseLock();
+    process.exit(143);
+  });
 
   let account = loadAccount();
   if (!account) {

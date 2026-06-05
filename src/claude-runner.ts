@@ -61,6 +61,10 @@ type ClaudeJsonOutput = {
   // 其他字段不关心
 };
 
+export function isInterruptedExit(code: number | null): boolean {
+  return code === null || code === 130 || code === 143;
+}
+
 export async function runClaude(prompt: string, userId: string): Promise<string> {
   if (taskManager.has(userId)) {
     return "当前已有任务正在执行，请等待完成，或发送 /stop 中断当前任务。";
@@ -116,7 +120,7 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
 
     proc.on("close", (code) => {
       clearTimeout(killer);
-      if (code === null) {
+      if (isInterruptedExit(code)) {
         resolve("任务已中断。");
         return;
       }
