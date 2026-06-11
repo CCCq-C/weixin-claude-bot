@@ -16,8 +16,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
 import {
+  buildHiddenPowerShellInvocation,
   buildClaudeSpawnInvocation,
   buildClaudeSpawnOptions,
+  type ClaudeSpawnInvocation,
 } from "./claude-command.js";
 import { taskManager } from "./task-manager.js";
 import { buildAgentInput, CLAUDE_CODE_CAPABILITIES } from "./agent-capabilities.js";
@@ -64,8 +66,95 @@ type ClaudeJsonOutput = {
   // 其他字段不关心
 };
 
+type ClaudeRunFiles = {
+  dir: string;
+  payloadPath: string;
+  scriptPath: string;
+  stdoutPath: string;
+  stderrPath: string;
+  exitPath: string;
+};
+
 export function isInterruptedExit(code: number | null): boolean {
   return code === null || code === 130 || code === 143;
+}
+
+function psSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function createClaudeRunFiles(): ClaudeRunFiles {
+  const parentDir = path.resolve("data", "claude-runs");
+  fs.mkdirSync(parentDir, { recursive: true });
+  const dir = fs.mkdtempSync(path.join(parentDir, "run-"));
+  return {
+    dir,
+    payloadPath: path.join(dir, "payload.json"),
+    scriptPath: path.join(dir, "run.ps1"),
+    stdoutPath: path.join(dir, "stdout.txt"),
+    stderrPath: path.join(dir, "stderr.txt"),
+    exitPath: path.join(dir, "exit.txt"),
+  };
+}
+
+function writeWindowsHiddenClaudeRunner({
+  files,
+  invocation,
+}: {
+  files: ClaudeRunFiles;
+  invocation: ClaudeSpawnInvocation;
+}): ClaudeSpawnInvocation {
+  fs.writeFileSync(
+    files.payloadPath,
+    JSON.stringify(
+      {
+        command: invocation.command,
+        args: invocation.args,
+        cwd: config.vaultPath,
+        stdoutPath: files.stdoutPath,
+        stderrPath: files.stderrPath,
+        exitPath: files.exitPath,
+      },
+      null,
+      2,
+    ),
+    "utf-8",
+  );
+
+  const script = [
+    '$ErrorActionPreference = "Continue"',
+    `$payload = Get-Content -LiteralPath ${psSingleQuote(files.payloadPath)} -Raw | ConvertFrom-Json`,
+    "Set-Location -LiteralPath $payload.cwd",
+    "$arguments = @()",
+    "foreach ($item in $payload.args) { $arguments += [string]$item }",
+    "$null | & $payload.command @arguments 1> $payload.stdoutPath 2> $payload.stderrPath",
+    "$code = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } elseif ($?) { 0 } else { 1 }",
+    "Set-Content -LiteralPath $payload.exitPath -Value $code -Encoding UTF8",
+    "exit $code",
+    "",
+  ].join("\r\n");
+
+  fs.writeFileSync(files.scriptPath, script, "utf-8");
+  return buildHiddenPowerShellInvocation({ scriptPath: files.scriptPath });
+}
+
+function readTextFileIfExists(filePath: string): string {
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "";
+}
+
+function readWindowsExitCode(files: ClaudeRunFiles, fallback: number | null): number | null {
+  const raw = readTextFileIfExists(files.exitPath).trim();
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function cleanupClaudeRunFiles(files: ClaudeRunFiles): void {
+  try {
+    fs.rmSync(files.dir, { recursive: true, force: true });
+  } catch {
+    // Best-effort cleanup only; logs still contain the error if Claude failed.
+  }
 }
 
 export async function runClaude(prompt: string, userId: string): Promise<string> {
@@ -99,11 +188,19 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
   }
 
   return new Promise((resolve) => {
-    const invocation = buildClaudeSpawnInvocation({
+    const claudeInvocation = buildClaudeSpawnInvocation({
       command: config.claudeCommand,
       args,
       env: process.env,
     });
+    let runFiles: ClaudeRunFiles | undefined;
+    const invocation =
+      process.platform === "win32"
+        ? writeWindowsHiddenClaudeRunner({
+            files: (runFiles = createClaudeRunFiles()),
+            invocation: claudeInvocation,
+          })
+        : claudeInvocation;
     const proc = spawn(
       invocation.command,
       invocation.args,
@@ -129,12 +226,19 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
 
     proc.on("close", (code) => {
       clearTimeout(killer);
+      if (runFiles) {
+        stdout = readTextFileIfExists(runFiles.stdoutPath);
+        stderr = readTextFileIfExists(runFiles.stderrPath);
+        code = readWindowsExitCode(runFiles, code);
+      }
       if (isInterruptedExit(code)) {
+        if (runFiles) cleanupClaudeRunFiles(runFiles);
         resolve("任务已中断。");
         return;
       }
 
       if (code !== 0) {
+        if (runFiles) cleanupClaudeRunFiles(runFiles);
         resolve(
           `[Claude 退出码 ${code}]\n${(stderr || stdout).slice(0, 1500)}`,
         );
@@ -151,19 +255,23 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
         }
 
         if (data.is_error && data.result) {
+          if (runFiles) cleanupClaudeRunFiles(runFiles);
           resolve(`[Claude 报错] ${data.result.slice(0, 2000)}`);
           return;
         }
 
+        if (runFiles) cleanupClaudeRunFiles(runFiles);
         resolve(data.result ?? "[Claude 返回空]");
       } catch {
         // 解析失败 fallback 直接给原始输出
+        if (runFiles) cleanupClaudeRunFiles(runFiles);
         resolve(stdout.slice(0, 3500) || "[Claude 无输出]");
       }
     });
 
     proc.on("error", (e) => {
       clearTimeout(killer);
+      if (runFiles) cleanupClaudeRunFiles(runFiles);
       resolve(`[启动 claude 失败] ${e.message}`);
     });
   });

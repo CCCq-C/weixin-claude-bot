@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildHiddenPowerShellInvocation,
   buildClaudeSpawnInvocation,
   buildClaudeSpawnOptions,
   getClaudeCommand,
@@ -35,6 +36,24 @@ test("falls back to shell mode on native Windows when only claude.cmd can be res
   assert.equal(invocation.command, "claude.cmd");
   assert.deepEqual(invocation.args, ["-p", "hello"]);
   assert.equal(invocation.useShell, true);
+});
+
+test("builds a hidden PowerShell wrapper for Windows Claude tasks", () => {
+  const invocation = buildHiddenPowerShellInvocation({
+    scriptPath: "C:\\repo\\data\\claude-runs\\run.ps1",
+  });
+
+  assert.equal(invocation.command, "powershell.exe");
+  assert.equal(invocation.useShell, false);
+  assert.deepEqual(invocation.args, [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-WindowStyle",
+    "Hidden",
+    "-File",
+    "C:\\repo\\data\\claude-runs\\run.ps1",
+  ]);
 });
 
 test("uses requested shell mode in Claude spawn options", () => {

@@ -146,3 +146,23 @@ export function buildClaudeSpawnInvocation({
 
   return { command, args, useShell: true };
 }
+
+export function buildHiddenPowerShellInvocation({
+  scriptPath,
+}: {
+  scriptPath: string;
+}): ClaudeSpawnInvocation {
+  return {
+    command: "powershell.exe",
+    args: [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-WindowStyle",
+      "Hidden",
+      "-File",
+      scriptPath,
+    ],
+    useShell: false,
+  };
+}
