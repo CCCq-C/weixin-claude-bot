@@ -27,6 +27,16 @@ test("hides the transient Claude command window on native Windows", () => {
   assert.equal(options.windowsHide, true);
 });
 
+test("closes Claude stdin explicitly so Windows tasks do not wait for input", () => {
+  const options = buildClaudeSpawnOptions({
+    platform: "win32",
+    vaultPath: "C:\\Users\\Alice\\Documents\\Vault",
+    env: {},
+  });
+
+  assert.deepEqual(options.stdio, ["ignore", "pipe", "pipe"]);
+});
+
 test("does not use shell mode on macOS or Linux", () => {
   assert.equal(
     buildClaudeSpawnOptions({
