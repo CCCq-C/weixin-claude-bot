@@ -136,7 +136,7 @@ function writeWindowsHiddenClaudeRunner({
     "foreach ($item in $payload.args) { $arguments += [string]$item }",
     "Set-Location -LiteralPath $payload.cwd",
     "$prompt = Get-Content -LiteralPath $payload.promptPath -Raw -Encoding UTF8",
-    "$prompt | & $payload.command @arguments 1> $payload.stdoutPath 2> $payload.stderrPath",
+    "$prompt | & $payload.command @arguments 2> $payload.stderrPath | Out-File -FilePath $payload.stdoutPath -Encoding UTF8",
     "$code = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } elseif ($?) { 0 } else { 1 }",
     "Set-Content -LiteralPath $payload.exitPath -Value $code -Encoding UTF8",
     "exit $code",
@@ -147,8 +147,14 @@ function writeWindowsHiddenClaudeRunner({
   return buildHiddenPowerShellInvocation({ scriptPath: files.scriptPath });
 }
 
-function readTextFileIfExists(filePath: string): string {
-  return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "";
+export function readTextFileIfExists(filePath: string): string {
+  if (!fs.existsSync(filePath)) return "";
+  const bytes = fs.readFileSync(filePath);
+  if (bytes.length >= 2) {
+    if (bytes[0] === 0xff && bytes[1] === 0xfe) return bytes.toString("utf16le").replace(/^\uFEFF/, "");
+    if (bytes[0] === 0xfe && bytes[1] === 0xff) return bytes.swap16().toString("utf16le").replace(/^\uFEFF/, "");
+  }
+  return bytes.toString("utf-8").replace(/^\uFEFF/, "");
 }
 
 function readWindowsExitCode(files: ClaudeRunFiles, fallback: number | null): number | null {

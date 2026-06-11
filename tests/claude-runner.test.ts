@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-import { isInterruptedExit } from "../src/claude-runner.js";
+import {
+  isInterruptedExit,
+  readTextFileIfExists,
+} from "../src/claude-runner.js";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -21,7 +24,19 @@ test("Windows hidden Claude runner pipes the prompt file into claude -p", () => 
   );
 
   assert.match(source, /Get-Content.+payloadPath.+-Encoding UTF8/);
+  assert.match(source, /Out-File.+-Encoding UTF8/);
   assert.match(source, /promptPath/);
   assert.match(source, /\$prompt\s*\|\s*&\s*\$payload\.command/);
+  assert.doesNotMatch(source, /1>\s*\$payload\.stdoutPath/);
   assert.doesNotMatch(source, /\$null\s*\|\s*&/);
+});
+
+test("reads Windows PowerShell UTF-16 redirected output without mojibake", () => {
+  const dir = fs.mkdtempSync(path.join(repoRoot, "data", "test-utf16-"));
+  const filePath = path.join(dir, "stdout.txt");
+  fs.writeFileSync(filePath, Buffer.from("\uFEFF{\"result\":\"ok\"}", "utf16le"));
+
+  assert.equal(readTextFileIfExists(filePath), '{"result":"ok"}');
+
+  fs.rmSync(dir, { recursive: true, force: true });
 });
