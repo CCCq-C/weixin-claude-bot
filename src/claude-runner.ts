@@ -15,7 +15,10 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
-import { buildClaudeSpawnOptions } from "./claude-command.js";
+import {
+  buildClaudeSpawnInvocation,
+  buildClaudeSpawnOptions,
+} from "./claude-command.js";
 import { taskManager } from "./task-manager.js";
 import { buildAgentInput, CLAUDE_CODE_CAPABILITIES } from "./agent-capabilities.js";
 
@@ -96,12 +99,18 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
   }
 
   return new Promise((resolve) => {
-    const proc = spawn(
-      config.claudeCommand,
+    const invocation = buildClaudeSpawnInvocation({
+      command: config.claudeCommand,
       args,
+      env: process.env,
+    });
+    const proc = spawn(
+      invocation.command,
+      invocation.args,
       buildClaudeSpawnOptions({
         vaultPath: config.vaultPath,
         env: process.env,
+        useShell: invocation.useShell,
       }),
     );
     if (!taskManager.register(userId, proc)) {

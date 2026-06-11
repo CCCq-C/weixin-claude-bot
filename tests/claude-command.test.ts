@@ -1,20 +1,52 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildClaudeSpawnInvocation,
   buildClaudeSpawnOptions,
   getClaudeCommand,
   validateVaultPath,
 } from "../src/claude-command.js";
 
-test("uses shell mode on native Windows so claude.cmd can be resolved", () => {
+test("resolves Windows npm claude.cmd to the native Claude executable", () => {
+  const exePath =
+    "C:\\Users\\Alice\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe";
+  const invocation = buildClaudeSpawnInvocation({
+    command: "claude.cmd",
+    args: ["-p", "hello"],
+    platform: "win32",
+    env: { APPDATA: "C:\\Users\\Alice\\AppData\\Roaming" },
+    fileExists: (filePath) => filePath === exePath,
+  });
+
+  assert.equal(invocation.command, exePath);
+  assert.deepEqual(invocation.args, ["-p", "hello"]);
+  assert.equal(invocation.useShell, false);
+});
+
+test("falls back to shell mode on native Windows when only claude.cmd can be resolved", () => {
+  const invocation = buildClaudeSpawnInvocation({
+    command: "claude.cmd",
+    args: ["-p", "hello"],
+    platform: "win32",
+    env: {},
+    fileExists: () => false,
+  });
+
+  assert.equal(invocation.command, "claude.cmd");
+  assert.deepEqual(invocation.args, ["-p", "hello"]);
+  assert.equal(invocation.useShell, true);
+});
+
+test("uses requested shell mode in Claude spawn options", () => {
   const options = buildClaudeSpawnOptions({
     platform: "win32",
     vaultPath: "C:\\Users\\Alice\\Documents\\Vault",
     env: { PATH: "C:\\Users\\Alice\\AppData\\Roaming\\npm" },
+    useShell: false,
   });
 
   assert.equal(options.cwd, "C:\\Users\\Alice\\Documents\\Vault");
-  assert.equal(options.shell, true);
+  assert.equal(options.shell, false);
 });
 
 test("hides the transient Claude command window on native Windows", () => {
