@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const DEFAULT_DIRECT_REPLY_LIMIT = 1200;
+export const ARCHIVED_REPLY_PREVIEW_LIMIT = 1000;
 export const RESULT_ARCHIVE_DIR = "微信Bot回复归档";
 
 type PrepareResultDeliveryOptions = {
@@ -92,7 +93,7 @@ export function prepareResultDelivery(
 
   fs.writeFileSync(archivePath, body, "utf-8");
 
-  const preview = buildPreview(result, 360);
+  const preview = buildPreview(result, ARCHIVED_REPLY_PREVIEW_LIMIT);
   const message = [
     "结果比较长，我已写入仓库：",
     relativeArchivePath,

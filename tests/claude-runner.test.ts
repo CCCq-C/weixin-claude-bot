@@ -32,6 +32,16 @@ test("Windows hidden Claude runner passes the user prompt as a claude -p argumen
   assert.doesNotMatch(source, /\$null\s*\|\s*&/);
 });
 
+test("WeChat reply guidance asks Claude for an 800-1000 character summary", () => {
+  const source = fs.readFileSync(
+    path.join(repoRoot, "src", "claude-runner.ts"),
+    "utf-8",
+  );
+
+  assert.match(source, /800-1000 字摘要/);
+  assert.doesNotMatch(source, /100 字以内/);
+});
+
 test("reads Windows PowerShell UTF-16 redirected output without mojibake", () => {
   const dir = fs.mkdtempSync(path.join(repoRoot, "data", "test-utf16-"));
   const filePath = path.join(dir, "stdout.txt");

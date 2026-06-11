@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  ARCHIVED_REPLY_PREVIEW_LIMIT,
   prepareResultDelivery,
   RESULT_ARCHIVE_DIR,
 } from "../src/result-delivery.js";
@@ -41,6 +42,8 @@ test("archives long Claude results and returns a short WeChat-safe message", () 
   assert.match(prepared.messages[0]!, /结果比较长/);
   assert.match(prepared.messages[0]!, /微信里只发短预览/);
   assert.ok(prepared.messages[0]!.length < longResult.length);
+  assert.equal(ARCHIVED_REPLY_PREVIEW_LIMIT, 1000);
+  assert.ok(prepared.messages[0]!.length > 1000);
 
   const archived = fs.readFileSync(prepared.archivePath, "utf-8");
   assert.match(archived, /# 微信 Bot 回复归档/);
