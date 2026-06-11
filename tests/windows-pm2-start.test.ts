@@ -29,6 +29,16 @@ test("Windows PM2 launcher starts the ecosystem file, not npm directly", () => {
   assert.doesNotMatch(script, /pm2\s+start\s+npm/i);
 });
 
+test("Windows PM2 launcher rebuilds any existing process with the latest config", () => {
+  const script = fs.readFileSync(
+    path.join(repoRoot, "scripts", "windows", "start-pm2.ps1"),
+    "utf-8",
+  );
+
+  assert.match(script, /pm2\s+delete\s+weixin-claude-bot/i);
+  assert.doesNotMatch(script, /pm2\s+restart\s+weixin-claude-bot/i);
+});
+
 test("Windows startup task uses the PM2 launcher instead of foreground npm start", () => {
   const script = fs.readFileSync(
     path.join(repoRoot, "scripts", "windows", "install-startup-task.ps1"),
