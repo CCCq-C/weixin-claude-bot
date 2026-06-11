@@ -69,6 +69,7 @@ type ClaudeJsonOutput = {
 type ClaudeRunFiles = {
   dir: string;
   payloadPath: string;
+  promptPath: string;
   scriptPath: string;
   stdoutPath: string;
   stderrPath: string;
@@ -90,6 +91,7 @@ function createClaudeRunFiles(): ClaudeRunFiles {
   return {
     dir,
     payloadPath: path.join(dir, "payload.json"),
+    promptPath: path.join(dir, "prompt.txt"),
     scriptPath: path.join(dir, "run.ps1"),
     stdoutPath: path.join(dir, "stdout.txt"),
     stderrPath: path.join(dir, "stderr.txt"),
@@ -100,10 +102,13 @@ function createClaudeRunFiles(): ClaudeRunFiles {
 function writeWindowsHiddenClaudeRunner({
   files,
   invocation,
+  prompt,
 }: {
   files: ClaudeRunFiles;
   invocation: ClaudeSpawnInvocation;
+  prompt: string;
 }): ClaudeSpawnInvocation {
+  fs.writeFileSync(files.promptPath, prompt, "utf-8");
   fs.writeFileSync(
     files.payloadPath,
     JSON.stringify(
@@ -111,6 +116,7 @@ function writeWindowsHiddenClaudeRunner({
         command: invocation.command,
         args: invocation.args,
         cwd: config.vaultPath,
+        promptPath: files.promptPath,
         stdoutPath: files.stdoutPath,
         stderrPath: files.stderrPath,
         exitPath: files.exitPath,
@@ -123,11 +129,15 @@ function writeWindowsHiddenClaudeRunner({
 
   const script = [
     '$ErrorActionPreference = "Continue"',
+    "[Console]::InputEncoding = [System.Text.Encoding]::UTF8",
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
     `$payload = Get-Content -LiteralPath ${psSingleQuote(files.payloadPath)} -Raw | ConvertFrom-Json`,
     "$arguments = @()",
     "foreach ($item in $payload.args) { $arguments += [string]$item }",
-    "$process = Start-Process -FilePath $payload.command -ArgumentList $arguments -WorkingDirectory $payload.cwd -WindowStyle Hidden -RedirectStandardOutput $payload.stdoutPath -RedirectStandardError $payload.stderrPath -Wait -PassThru",
-    "$code = if ($null -ne $process.ExitCode) { $process.ExitCode } else { 1 }",
+    "Set-Location -LiteralPath $payload.cwd",
+    "$prompt = Get-Content -LiteralPath $payload.promptPath -Raw -Encoding UTF8",
+    "$prompt | & $payload.command @arguments 1> $payload.stdoutPath 2> $payload.stderrPath",
+    "$code = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } elseif ($?) { 0 } else { 1 }",
     "Set-Content -LiteralPath $payload.exitPath -Value $code -Encoding UTF8",
     "exit $code",
     "",
@@ -169,9 +179,7 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
   // bypassPermissions：跳过所有权限弹窗
   // 安全护栏：上层 index.ts 已用 WHITELIST_USER_IDS 限定为 bot 主人自己；
   // 没有白名单的人发的消息根本进不到这里。
-  const args = [
-    "-p",
-    agentPrompt,
+  const claudeOptions = [
     "--output-format",
     "json",
     "--permission-mode",
@@ -180,16 +188,18 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
     WECHAT_REPLY_PREAMBLE,
   ];
   if (config.claudeModel) {
-    args.push("--model", config.claudeModel);
+    claudeOptions.push("--model", config.claudeModel);
   }
   if (sessions[userId]) {
-    args.push("--resume", sessions[userId]);
+    claudeOptions.push("--resume", sessions[userId]);
   }
+  const args = ["-p", agentPrompt, ...claudeOptions];
+  const windowsArgs = ["-p", ...claudeOptions];
 
   return new Promise((resolve) => {
     const claudeInvocation = buildClaudeSpawnInvocation({
       command: config.claudeCommand,
-      args,
+      args: process.platform === "win32" ? windowsArgs : args,
       env: process.env,
     });
     let runFiles: ClaudeRunFiles | undefined;
@@ -198,6 +208,7 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
         ? writeWindowsHiddenClaudeRunner({
             files: (runFiles = createClaudeRunFiles()),
             invocation: claudeInvocation,
+            prompt: agentPrompt,
           })
         : claudeInvocation;
     const proc = spawn(
@@ -237,9 +248,9 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
       }
 
       if (code !== 0) {
-        if (runFiles) cleanupClaudeRunFiles(runFiles);
+        const logHint = runFiles ? `\n日志目录: ${runFiles.dir}` : "";
         resolve(
-          `[Claude 退出码 ${code}]\n${(stderr || stdout).slice(0, 1500)}`,
+          `[Claude 退出码 ${code}]${logHint}\n${(stderr || stdout).slice(0, 1500)}`,
         );
         return;
       }

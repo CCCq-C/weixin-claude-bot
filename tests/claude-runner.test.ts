@@ -14,13 +14,13 @@ test("treats normal cancellation exit codes as interrupted tasks", () => {
   assert.equal(isInterruptedExit(1), false);
 });
 
-test("Windows hidden Claude runner starts a hidden process without piping stdin", () => {
+test("Windows hidden Claude runner pipes the prompt file into claude -p", () => {
   const source = fs.readFileSync(
     path.join(repoRoot, "src", "claude-runner.ts"),
     "utf-8",
   );
 
-  assert.match(source, /Start-Process/);
-  assert.match(source, /-WindowStyle\s+Hidden/);
+  assert.match(source, /promptPath/);
+  assert.match(source, /\$prompt\s*\|\s*&\s*\$payload\.command/);
   assert.doesNotMatch(source, /\$null\s*\|\s*&/);
 });
