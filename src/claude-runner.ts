@@ -124,11 +124,10 @@ function writeWindowsHiddenClaudeRunner({
   const script = [
     '$ErrorActionPreference = "Continue"',
     `$payload = Get-Content -LiteralPath ${psSingleQuote(files.payloadPath)} -Raw | ConvertFrom-Json`,
-    "Set-Location -LiteralPath $payload.cwd",
     "$arguments = @()",
     "foreach ($item in $payload.args) { $arguments += [string]$item }",
-    "$null | & $payload.command @arguments 1> $payload.stdoutPath 2> $payload.stderrPath",
-    "$code = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } elseif ($?) { 0 } else { 1 }",
+    "$process = Start-Process -FilePath $payload.command -ArgumentList $arguments -WorkingDirectory $payload.cwd -WindowStyle Hidden -RedirectStandardOutput $payload.stdoutPath -RedirectStandardError $payload.stderrPath -Wait -PassThru",
+    "$code = if ($null -ne $process.ExitCode) { $process.ExitCode } else { 1 }",
     "Set-Content -LiteralPath $payload.exitPath -Value $code -Encoding UTF8",
     "exit $code",
     "",
