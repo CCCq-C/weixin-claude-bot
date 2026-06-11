@@ -37,6 +37,8 @@ test("Windows PM2 launcher rebuilds any existing process with the latest config"
 
   assert.match(script, /pm2\s+delete\s+weixin-claude-bot/i);
   assert.doesNotMatch(script, /pm2\s+restart\s+weixin-claude-bot/i);
+  assert.doesNotMatch(script, /ConvertFrom-Json/i);
+  assert.doesNotMatch(script, /pm2\s+jlist/i);
 });
 
 test("Windows startup task uses the PM2 launcher instead of foreground npm start", () => {
