@@ -72,26 +72,45 @@ function windowsClaudeExeCandidates(
   env: NodeJS.ProcessEnv,
 ): string[] {
   const candidates: string[] = [];
-  const packageExe = path.win32.join(
-    "node_modules",
-    "@anthropic-ai",
-    "claude-code",
-    "bin",
-    "claude.exe",
-  );
+  const packageExeCandidates = [
+    path.win32.join(
+      "node_modules",
+      "@anthropic-ai",
+      "claude-code",
+      "node_modules",
+      "@anthropic-ai",
+      "claude-code-win32-x64",
+      "claude.exe",
+    ),
+    path.win32.join(
+      "node_modules",
+      "@anthropic-ai",
+      "claude-code",
+      "bin",
+      "claude.exe",
+    ),
+  ];
 
   if (path.win32.isAbsolute(command)) {
-    candidates.push(path.win32.join(path.win32.dirname(command), packageExe));
+    for (const packageExe of packageExeCandidates) {
+      candidates.push(path.win32.join(path.win32.dirname(command), packageExe));
+    }
   }
   if (env.APPDATA) {
-    candidates.push(path.win32.join(env.APPDATA, "npm", packageExe));
+    for (const packageExe of packageExeCandidates) {
+      candidates.push(path.win32.join(env.APPDATA, "npm", packageExe));
+    }
   }
   if (env.npm_config_prefix) {
-    candidates.push(path.win32.join(env.npm_config_prefix, packageExe));
+    for (const packageExe of packageExeCandidates) {
+      candidates.push(path.win32.join(env.npm_config_prefix, packageExe));
+    }
   }
 
   for (const dir of pathEnv(env).split(path.win32.delimiter).filter(Boolean)) {
-    candidates.push(path.win32.join(dir, packageExe));
+    for (const packageExe of packageExeCandidates) {
+      candidates.push(path.win32.join(dir, packageExe));
+    }
   }
 
   return Array.from(new Set(candidates));

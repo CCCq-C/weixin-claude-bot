@@ -10,7 +10,7 @@ import {
 
 test("resolves Windows npm claude.cmd to the native Claude executable", () => {
   const exePath =
-    "C:\\Users\\Alice\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe";
+    "C:\\Users\\Alice\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\node_modules\\@anthropic-ai\\claude-code-win32-x64\\claude.exe";
   const invocation = buildClaudeSpawnInvocation({
     command: "claude.cmd",
     args: ["-p", "hello"],
