@@ -69,7 +69,6 @@ type ClaudeJsonOutput = {
 type ClaudeRunFiles = {
   dir: string;
   payloadPath: string;
-  promptPath: string;
   scriptPath: string;
   stdoutPath: string;
   stderrPath: string;
@@ -91,7 +90,6 @@ function createClaudeRunFiles(): ClaudeRunFiles {
   return {
     dir,
     payloadPath: path.join(dir, "payload.json"),
-    promptPath: path.join(dir, "prompt.txt"),
     scriptPath: path.join(dir, "run.ps1"),
     stdoutPath: path.join(dir, "stdout.txt"),
     stderrPath: path.join(dir, "stderr.txt"),
@@ -102,13 +100,10 @@ function createClaudeRunFiles(): ClaudeRunFiles {
 function writeWindowsHiddenClaudeRunner({
   files,
   invocation,
-  prompt,
 }: {
   files: ClaudeRunFiles;
   invocation: ClaudeSpawnInvocation;
-  prompt: string;
 }): ClaudeSpawnInvocation {
-  fs.writeFileSync(files.promptPath, prompt, "utf-8");
   fs.writeFileSync(
     files.payloadPath,
     JSON.stringify(
@@ -116,7 +111,6 @@ function writeWindowsHiddenClaudeRunner({
         command: invocation.command,
         args: invocation.args,
         cwd: config.vaultPath,
-        promptPath: files.promptPath,
         stdoutPath: files.stdoutPath,
         stderrPath: files.stderrPath,
         exitPath: files.exitPath,
@@ -135,8 +129,7 @@ function writeWindowsHiddenClaudeRunner({
     "$arguments = @()",
     "foreach ($item in $payload.args) { $arguments += [string]$item }",
     "Set-Location -LiteralPath $payload.cwd",
-    "$prompt = Get-Content -LiteralPath $payload.promptPath -Raw -Encoding UTF8",
-    "$prompt | & $payload.command @arguments 2> $payload.stderrPath | Out-File -FilePath $payload.stdoutPath -Encoding UTF8",
+    "& $payload.command @arguments 2> $payload.stderrPath | Out-File -FilePath $payload.stdoutPath -Encoding UTF8",
     "$code = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } elseif ($?) { 0 } else { 1 }",
     "Set-Content -LiteralPath $payload.exitPath -Value $code -Encoding UTF8",
     "exit $code",
@@ -200,12 +193,11 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
     claudeOptions.push("--resume", sessions[userId]);
   }
   const args = ["-p", agentPrompt, ...claudeOptions];
-  const windowsArgs = ["-p", ...claudeOptions];
 
   return new Promise((resolve) => {
     const claudeInvocation = buildClaudeSpawnInvocation({
       command: config.claudeCommand,
-      args: process.platform === "win32" ? windowsArgs : args,
+      args,
       env: process.env,
     });
     let runFiles: ClaudeRunFiles | undefined;
@@ -214,7 +206,6 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
         ? writeWindowsHiddenClaudeRunner({
             files: (runFiles = createClaudeRunFiles()),
             invocation: claudeInvocation,
-            prompt: agentPrompt,
           })
         : claudeInvocation;
     const proc = spawn(

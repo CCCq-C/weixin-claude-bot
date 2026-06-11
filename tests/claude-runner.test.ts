@@ -17,7 +17,7 @@ test("treats normal cancellation exit codes as interrupted tasks", () => {
   assert.equal(isInterruptedExit(1), false);
 });
 
-test("Windows hidden Claude runner pipes the prompt file into claude -p", () => {
+test("Windows hidden Claude runner passes the user prompt as a claude -p argument", () => {
   const source = fs.readFileSync(
     path.join(repoRoot, "src", "claude-runner.ts"),
     "utf-8",
@@ -25,8 +25,9 @@ test("Windows hidden Claude runner pipes the prompt file into claude -p", () => 
 
   assert.match(source, /Get-Content.+payloadPath.+-Encoding UTF8/);
   assert.match(source, /Out-File.+-Encoding UTF8/);
-  assert.match(source, /promptPath/);
-  assert.match(source, /\$prompt\s*\|\s*&\s*\$payload\.command/);
+  assert.match(source, /const args = \["-p", agentPrompt, \.\.\.claudeOptions\]/);
+  assert.doesNotMatch(source, /promptPath/);
+  assert.doesNotMatch(source, /\$prompt\s*\|\s*&\s*\$payload\.command/);
   assert.doesNotMatch(source, /1>\s*\$payload\.stdoutPath/);
   assert.doesNotMatch(source, /\$null\s*\|\s*&/);
 });
