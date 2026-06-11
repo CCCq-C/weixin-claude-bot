@@ -2,7 +2,7 @@
  * 入口（M3 阶段）：
  *   - 没 data/account.json → 走扫码登录
  *   - 有账号 → 长轮询 getupdates，把白名单用户的文本消息派给本地 Claude CLI，
- *     Claude 在 VAULT_PATH 里干活，结果切片回微信
+ *     Claude 在 VAULT_PATH 里干活，短结果回微信，长结果归档后回传路径
  */
 import { config, assertConfig } from "./config.js";
 import { login, loadAccount } from "./login.js";
@@ -21,6 +21,7 @@ import {
   buildTaskStartedMessage,
 } from "./wechat-task-messages.js";
 import { acquireInstanceLock } from "./instance-lock.js";
+import { prepareResultDelivery } from "./result-delivery.js";
 
 const WECHAT_CHUNK = 3500; // 单条文本上限保守值
 
@@ -179,9 +180,30 @@ async function main(): Promise<void> {
       const elapsed = Math.round((Date.now() - t0) / 1000);
       console.log(`[claude] ${elapsed}s, ${result.length} chars`);
 
-      // 3. 切片回复
-      const chunks = splitForWechat(result);
       let resultDelivered = true;
+      let chunks: string[];
+      try {
+        const delivery = prepareResultDelivery({
+          vaultPath: config.vaultPath,
+          userId: from,
+          result,
+        });
+        chunks = delivery.messages.flatMap((message) => splitForWechat(message));
+        if (delivery.archived) {
+          appendEvent("data", "task-result-archived", {
+            from,
+            relativeArchivePath: delivery.relativeArchivePath,
+          });
+        }
+      } catch (e: unknown) {
+        resultDelivered = false;
+        chunks = ["结果生成完成，但写入仓库归档失败，请查看终端日志。"];
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        console.error(`[delivery] 结果交付准备失败: ${errorMessage}`);
+        updateStatus("data", { lastError: errorMessage });
+      }
+
+      // 3. 切片回复
       let deliveredChunks = 0;
       for (let i = 0; i < chunks.length; i++) {
         const piece =

@@ -12,8 +12,9 @@ module.exports = {
   apps: [
     {
       name: "weixin-claude-bot",
-      script: "npm",
-      args: "start",
+      script: "src/index.ts",
+      interpreter: "node",
+      node_args: "--import tsx",
       cwd: __dirname,
       autorestart: true,
       max_memory_restart: "500M",

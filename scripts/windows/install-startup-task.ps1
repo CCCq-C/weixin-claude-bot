@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$StartScript = Join-Path $RepoRoot "scripts\windows\start.ps1"
+$StartScript = Join-Path $RepoRoot "scripts\windows\start-pm2.ps1"
 $TaskName = "weixin-claude-bot"
 $PowerShell = (Get-Command powershell.exe).Source
 $Argument = "-NoProfile -ExecutionPolicy Bypass -File `"$StartScript`""

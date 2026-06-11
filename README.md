@@ -186,10 +186,16 @@ npm run login
 WHITELIST_USER_IDS="xxx@im.wechat"
 ```
 
-启动：
+前台启动（适合第一次验证；关闭这个终端后 bot 会停止）：
 
 ```powershell
 npm start
+```
+
+后台常驻启动（Windows 推荐）：
+
+```powershell
+.\scripts\windows\start-pm2.ps1
 ```
 
 如果 Windows 找不到 `claude`，但 `claude.cmd` 存在，可以在 `.env` 里指定：
@@ -198,7 +204,7 @@ npm start
 CLAUDE_COMMAND=claude.cmd
 ```
 
-Windows 开机自启建议使用任务计划程序：
+Windows 开机自启建议使用任务计划程序，任务会调用 PM2 后台启动脚本：
 
 ```powershell
 .\scripts\windows\install-startup-task.ps1
@@ -356,11 +362,23 @@ npm start
 
 目标：让 bot 在后台运行。
 
+Windows 推荐：
+
+```powershell
+npm install -g pm2
+.\scripts\windows\start-pm2.ps1
+pm2 logs weixin-claude-bot --lines 80 --nostream
+```
+
+macOS / Linux：
+
 ```bash
 npm install -g pm2
 pm2 start ecosystem.config.cjs
 pm2 logs weixin-claude-bot
 ```
+
+不要在 Windows 上使用 `pm2 start npm --name weixin-claude-bot -- start`。PM2 可能会把 `npm.cmd` 当成 JavaScript 文件交给 Node 执行，日志里会出现 `SyntaxError: Unexpected token ':'`。
 
 通过标准：
 
