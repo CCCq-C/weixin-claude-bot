@@ -24,9 +24,9 @@ test("resolves Windows npm claude.cmd to the native Claude executable", () => {
   assert.equal(invocation.useShell, false);
 });
 
-test("falls back to shell mode on native Windows when only claude.cmd can be resolved", () => {
+test("falls back to claude.cmd on native Windows when no native exe is found", () => {
   const invocation = buildClaudeSpawnInvocation({
-    command: "claude.cmd",
+    command: "claude",
     args: ["-p", "hello"],
     platform: "win32",
     env: {},
@@ -35,6 +35,20 @@ test("falls back to shell mode on native Windows when only claude.cmd can be res
 
   assert.equal(invocation.command, "claude.cmd");
   assert.deepEqual(invocation.args, ["-p", "hello"]);
+  assert.equal(invocation.useShell, true);
+});
+
+test("uses the matching .cmd shim for absolute Windows npm shim paths", () => {
+  const invocation = buildClaudeSpawnInvocation({
+    command: "C:\\Users\\Alice\\AppData\\Roaming\\npm\\claude",
+    args: ["-p", "hello"],
+    platform: "win32",
+    env: {},
+    fileExists: (filePath) =>
+      filePath === "C:\\Users\\Alice\\AppData\\Roaming\\npm\\claude.cmd",
+  });
+
+  assert.equal(invocation.command, "C:\\Users\\Alice\\AppData\\Roaming\\npm\\claude.cmd");
   assert.equal(invocation.useShell, true);
 });
 

@@ -122,6 +122,25 @@ function resolveWindowsClaudeExecutable({
   return windowsClaudeExeCandidates(command, env).find(fileExists);
 }
 
+function resolveWindowsClaudeCmdShim({
+  command,
+  fileExists,
+}: {
+  command: string;
+  fileExists: FileExists;
+}): string {
+  const normalized = command.replace(/\//g, "\\").toLowerCase();
+  if (normalized === "claude") return "claude.cmd";
+  if (normalized === "claude.cmd" || normalized.endsWith("\\claude.cmd")) {
+    return command;
+  }
+  if (path.win32.isAbsolute(command) && !path.win32.extname(command)) {
+    const cmdPath = `${command}.cmd`;
+    if (fileExists(cmdPath)) return cmdPath;
+  }
+  return command;
+}
+
 export function buildClaudeSpawnInvocation({
   command,
   args,
@@ -144,7 +163,11 @@ export function buildClaudeSpawnInvocation({
     return { command: executable, args, useShell: false };
   }
 
-  return { command, args, useShell: true };
+  return {
+    command: resolveWindowsClaudeCmdShim({ command, fileExists }),
+    args,
+    useShell: true,
+  };
 }
 
 export function buildHiddenPowerShellInvocation({

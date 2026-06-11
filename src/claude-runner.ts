@@ -237,8 +237,10 @@ export async function runClaude(prompt: string, userId: string): Promise<string>
     proc.on("close", (code) => {
       clearTimeout(killer);
       if (runFiles) {
-        stdout = readTextFileIfExists(runFiles.stdoutPath);
-        stderr = readTextFileIfExists(runFiles.stderrPath);
+        const wrapperStdout = stdout;
+        const wrapperStderr = stderr;
+        stdout = readTextFileIfExists(runFiles.stdoutPath) || wrapperStdout;
+        stderr = readTextFileIfExists(runFiles.stderrPath) || wrapperStderr;
         code = readWindowsExitCode(runFiles, code);
       }
       if (isInterruptedExit(code)) {
