@@ -20,6 +20,7 @@ test("Windows hidden Claude runner pipes the prompt file into claude -p", () => 
     "utf-8",
   );
 
+  assert.match(source, /Get-Content.+payloadPath.+-Encoding UTF8/);
   assert.match(source, /promptPath/);
   assert.match(source, /\$prompt\s*\|\s*&\s*\$payload\.command/);
   assert.doesNotMatch(source, /\$null\s*\|\s*&/);

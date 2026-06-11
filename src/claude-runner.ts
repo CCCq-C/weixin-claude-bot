@@ -131,7 +131,7 @@ function writeWindowsHiddenClaudeRunner({
     '$ErrorActionPreference = "Continue"',
     "[Console]::InputEncoding = [System.Text.Encoding]::UTF8",
     "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
-    `$payload = Get-Content -LiteralPath ${psSingleQuote(files.payloadPath)} -Raw | ConvertFrom-Json`,
+    `$payload = Get-Content -LiteralPath ${psSingleQuote(files.payloadPath)} -Raw -Encoding UTF8 | ConvertFrom-Json`,
     "$arguments = @()",
     "foreach ($item in $payload.args) { $arguments += [string]$item }",
     "Set-Location -LiteralPath $payload.cwd",
