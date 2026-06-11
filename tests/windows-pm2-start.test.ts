@@ -48,3 +48,14 @@ test("Windows startup task uses the PM2 launcher instead of foreground npm start
   assert.match(script, /start-pm2\.ps1/);
   assert.doesNotMatch(script, /start\.ps1/);
 });
+
+test("Windows CMD wrapper runs the PowerShell PM2 launcher explicitly", () => {
+  const script = fs.readFileSync(
+    path.join(repoRoot, "scripts", "windows", "start-pm2.cmd"),
+    "utf-8",
+  );
+
+  assert.match(script, /powershell\.exe/i);
+  assert.match(script, /-ExecutionPolicy\s+Bypass/i);
+  assert.match(script, /start-pm2\.ps1/i);
+});

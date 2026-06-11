@@ -195,7 +195,7 @@ npm start
 后台常驻启动（Windows 推荐）：
 
 ```powershell
-.\scripts\windows\start-pm2.ps1
+.\scripts\windows\start-pm2.cmd
 ```
 
 如果 Windows 找不到 `claude`，但 `claude.cmd` 存在，可以在 `.env` 里指定：
@@ -366,7 +366,7 @@ Windows 推荐：
 
 ```powershell
 npm install -g pm2
-.\scripts\windows\start-pm2.ps1
+.\scripts\windows\start-pm2.cmd
 pm2 logs weixin-claude-bot --lines 80 --nostream
 ```
 
