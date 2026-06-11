@@ -48,5 +48,6 @@ export function buildClaudeSpawnOptions({
     cwd: vaultPath,
     env,
     shell: platform === "win32",
+    windowsHide: platform === "win32",
   };
 }

@@ -17,6 +17,16 @@ test("uses shell mode on native Windows so claude.cmd can be resolved", () => {
   assert.equal(options.shell, true);
 });
 
+test("hides the transient Claude command window on native Windows", () => {
+  const options = buildClaudeSpawnOptions({
+    platform: "win32",
+    vaultPath: "C:\\Users\\Alice\\Documents\\Vault",
+    env: {},
+  });
+
+  assert.equal(options.windowsHide, true);
+});
+
 test("does not use shell mode on macOS or Linux", () => {
   assert.equal(
     buildClaudeSpawnOptions({
