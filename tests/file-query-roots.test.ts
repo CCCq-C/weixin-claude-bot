@@ -33,6 +33,22 @@ test("resolves a named Downloads folder from the user query", async () => {
   assert.deepEqual(roots, [target]);
 });
 
+test("prefers the named folder over matching child folders for spoken nested requests", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-home-"));
+  const target = path.join(home, "Downloads", "AI森雪赚安装包-Mac版");
+  const noisy = path.join(target, "vault", "SKILL清单");
+  fs.mkdirSync(noisy, { recursive: true });
+
+  const intent = parseFileSendIntent("我下载里面有个 MAC 文件夹，里面有个 skill大全，发给我");
+  assert.ok(intent);
+
+  const roots = await resolveFileQueryRoots(intent.query, {
+    homeDir: home,
+  });
+
+  assert.equal(roots[0], target);
+});
+
 test("resolves an absolute directory path from the user query", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-abs-"));
 

@@ -296,7 +296,6 @@ function rankDirectories(
     for (const keyword of keywords) {
       if (name === keyword) score += 100;
       else if (name.includes(keyword)) score += 70;
-      else if (dir.toLowerCase().includes(keyword)) score += 30;
     }
     if (lowerQuery.includes(name)) score += 40;
     if (score <= 0) continue;
