@@ -14,6 +14,7 @@ export type FindLocalFileOptions = {
   limit?: number;
   timeoutMs?: number;
   maxScanned?: number;
+  preserveRootOrder?: boolean;
 };
 
 const EXCLUDED_DIR_NAMES = new Set([
@@ -59,12 +60,31 @@ export async function findLocalFileCandidates(
   candidates.push(...(await scanRoots(roots, options)));
 
   const unique = dedupeByPath(candidates);
+  if (options.preserveRootOrder && roots.length > 0) {
+    const rankedByRoot = roots.flatMap((root) =>
+      rankFileCandidates(
+        unique.filter((candidate) => isUnderRoot(candidate.path, root)),
+        {
+          query: intent.query,
+          extensions: intent.extensions,
+          now: options.now,
+          limit,
+        },
+      ),
+    );
+    return dedupeByPath(rankedByRoot).slice(0, limit);
+  }
   return rankFileCandidates(unique, {
     query: intent.query,
     extensions: intent.extensions,
     now: options.now,
     limit,
   });
+}
+
+function isUnderRoot(filePath: string, root: string): boolean {
+  const relative = path.relative(root, filePath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 async function findWithMdfind(intent: FileSendIntent, timeoutMs: number): Promise<FileCandidate[]> {

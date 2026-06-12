@@ -34,6 +34,8 @@ const SEND_PATTERNS = [
   /发送/,
   /给我那个/,
   /给我.*文件/,
+  /(?:我要|我需要|需要|要).*(?:文件|\.md|\.markdown|\.pdf|\.docx?|\.xlsx?|\.pptx?)/i,
+  /发给.*微信/,
   /把.+发/,
 ];
 
@@ -112,12 +114,36 @@ export function parseFileSelectionReply(text: string): FileSelectionReply | null
     return { type: "confirm" };
   }
 
+  const chineseIndex = parseChineseSelectionIndex(normalized);
+  if (typeof chineseIndex === "number") {
+    return { type: "select", index: chineseIndex };
+  }
+
   const match = normalized.match(/^(?:第)?\s*([1-9]\d*)\s*(?:个)?$/);
   if (match) {
     return { type: "select", index: Number(match[1]) - 1 };
   }
 
   return null;
+}
+
+function parseChineseSelectionIndex(text: string): number | null {
+  const match = text.match(/^第?\s*([一二三四五六七八九十])\s*个?$/);
+  const value = match?.[1];
+  if (!value) return null;
+  const indexMap: Record<string, number> = {
+    一: 0,
+    二: 1,
+    三: 2,
+    四: 3,
+    五: 4,
+    六: 5,
+    七: 6,
+    八: 7,
+    九: 8,
+    十: 9,
+  };
+  return indexMap[value] ?? null;
 }
 
 function detectKind(text: string): FileIntentKind | null {

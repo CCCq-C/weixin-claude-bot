@@ -99,6 +99,7 @@ async function startFileSearch(params: {
       roots: context.roots,
       timeoutMs: 5000,
       maxScanned: 10_000,
+      preserveRootOrder: true,
     });
   }
   if (candidates.length === 0) {

@@ -49,3 +49,28 @@ test("returns an absolute file path directly", async () => {
 
   assert.equal(candidates[0].path, file);
 });
+
+test("prefers files from earlier context roots", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-files-"));
+  const preferred = path.join(dir, "preferred");
+  const fallback = path.join(dir, "fallback");
+  fs.mkdirSync(preferred);
+  fs.mkdirSync(fallback);
+  const preferredFile = path.join(preferred, "README.md");
+  const fallbackFile = path.join(fallback, "README.md");
+  fs.writeFileSync(preferredFile, "preferred");
+  fs.writeFileSync(fallbackFile, "fallback");
+  fs.utimesSync(preferredFile, new Date("2026-06-10T12:00:00.000Z"), new Date("2026-06-10T12:00:00.000Z"));
+  fs.utimesSync(fallbackFile, new Date("2026-06-12T12:00:00.000Z"), new Date("2026-06-12T12:00:00.000Z"));
+
+  const candidates = await findLocalFileCandidates(
+    { query: "这个包里面的 md 文件", extensions: [".md"], kind: "send" },
+    {
+      roots: [preferred, fallback],
+      now: new Date("2026-06-12T12:00:00.000Z"),
+      preserveRootOrder: true,
+    },
+  );
+
+  assert.equal(candidates[0].path, preferredFile);
+});

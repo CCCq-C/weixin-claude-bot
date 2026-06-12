@@ -53,8 +53,24 @@ test("maps markdown file words to md extensions", () => {
   assert.deepEqual(intent.extensions, [".md", ".markdown"]);
 });
 
+test("treats want-file wording as a file send request", () => {
+  const intent = parseFileSendIntent("我要抖音的那个转录skill包里的md文件");
+
+  assert.equal(intent?.kind, "send");
+  assert.deepEqual(intent.extensions, [".md", ".markdown"]);
+});
+
+test("treats named markdown requests as a file send request", () => {
+  const intent = parseFileSendIntent("我要这个给AI看的安装和使用说明.md");
+
+  assert.equal(intent?.kind, "send");
+  assert.deepEqual(intent.extensions, [".md", ".markdown"]);
+});
+
 test("parses replies for pending file selection", () => {
   assert.deepEqual(parseFileSelectionReply("第 2 个"), { type: "select", index: 1 });
+  assert.deepEqual(parseFileSelectionReply("第一个"), { type: "select", index: 0 });
+  assert.deepEqual(parseFileSelectionReply("第二个"), { type: "select", index: 1 });
   assert.deepEqual(parseFileSelectionReply("确认"), { type: "confirm" });
   assert.deepEqual(parseFileSelectionReply("取消"), { type: "cancel" });
   assert.deepEqual(parseFileSelectionReply("别找了"), { type: "cancel" });
