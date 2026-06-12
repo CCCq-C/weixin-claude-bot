@@ -43,6 +43,26 @@ test("extracts desktop folder names from desktop-style listings", () => {
   ]);
 });
 
+test("extracts Chinese desktop folder names from Claude folder listings", () => {
+  const roots = extractFileContextRoots(
+    [
+      "历史/ 文件夹内容：",
+      "📁 子文件夹：",
+      "① `AI:SKILL内容/` — AI Skill 相关",
+      "② `GEO/` — 项目合同文件",
+      "③ `排班02/` — 排班页面",
+    ].join("\n"),
+    { homeDir: "/Users/me" },
+  );
+
+  assert.deepEqual(roots, [
+    "/Users/me/Desktop/历史",
+    "/Users/me/Desktop/历史/AI:SKILL内容",
+    "/Users/me/Desktop/历史/GEO",
+    "/Users/me/Desktop/历史/排班02",
+  ]);
+});
+
 test("saves only existing directories and expires context", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-context-"));
   const home = path.join(dir, "home");
@@ -69,6 +89,7 @@ test("saves only existing directories and expires context", () => {
 test("uses context only for contextual file requests", () => {
   assert.equal(shouldUseFileContext("这个包里面的 md 文件"), true);
   assert.equal(shouldUseFileContext("把文件发给我手机上"), true);
+  assert.equal(shouldUseFileContext("ai小组作业收集 xlsx"), true);
   assert.equal(shouldUseFileContext("把桌面那个 PPT 发过来"), false);
 });
 

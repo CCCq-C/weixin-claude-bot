@@ -24,7 +24,7 @@ const EXPLICIT_LOCATION_PATTERN = /桌面|Desktop|下载|Downloads|文档|Docume
 
 export function shouldUseFileContext(query: string): boolean {
   if (EXPLICIT_LOCATION_PATTERN.test(query)) return false;
-  return CONTEXT_WORD_PATTERN.test(query);
+  return CONTEXT_WORD_PATTERN.test(query) || query.trim().length > 0;
 }
 
 export function extractFileContextRoots(
@@ -40,7 +40,7 @@ export function extractFileContextRoots(
     if (root) roots.add(root);
   }
 
-  if (/桌面|Desktop/i.test(text)) {
+  if (/桌面|Desktop|文件夹内容|目录内容/i.test(text)) {
     for (const folderName of extractDesktopFolderNames(text)) {
       roots.add(path.join(homeDir, "Desktop", folderName));
     }
@@ -112,7 +112,29 @@ function extractDesktopFolderNames(text: string): string[] {
     const name = match[1];
     if (name && !name.startsWith(".")) names.add(name);
   }
+
+  let parentFolder: string | null = null;
+  for (const line of text.split("\n")) {
+    const folderName = extractFolderNameFromListingLine(line);
+    if (!folderName || folderName.startsWith(".")) continue;
+
+    if (/文件夹内容|目录内容/.test(line)) {
+      parentFolder = folderName;
+      names.add(folderName);
+      continue;
+    }
+
+    names.add(parentFolder ? path.join(parentFolder, folderName) : folderName);
+  }
   return [...names];
+}
+
+function extractFolderNameFromListingLine(line: string): string | null {
+  const match = line.match(
+    /^\s*(?:[-*•]\s*)?(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、]?)?\s*`?([^`/\n]+?)\/`?(?:\s|$|[—-])/u,
+  );
+  const name = match?.[1]?.trim();
+  return name || null;
 }
 
 function expandHome(value: string, homeDir: string): string {

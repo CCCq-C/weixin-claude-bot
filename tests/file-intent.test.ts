@@ -67,6 +67,14 @@ test("treats named markdown requests as a file send request", () => {
   assert.deepEqual(intent.extensions, [".md", ".markdown"]);
 });
 
+test("cleans spoken suffixes from exact file name requests", () => {
+  const intent = parseFileSendIntent("AI小组作业收集.xlsx我要这个文件发给我");
+
+  assert.equal(intent?.kind, "send");
+  assert.equal(intent.query, "ai小组作业收集 xlsx");
+  assert.deepEqual(intent.extensions, [".xls", ".xlsx"]);
+});
+
 test("parses replies for pending file selection", () => {
   assert.deepEqual(parseFileSelectionReply("第 2 个"), { type: "select", index: 1 });
   assert.deepEqual(parseFileSelectionReply("第一个"), { type: "select", index: 0 });

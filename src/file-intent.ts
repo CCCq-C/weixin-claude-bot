@@ -73,8 +73,12 @@ const FILLER_WORDS = [
   "传给我",
   "传一下",
   "发送",
+  "发到我的微信",
+  "发到微信",
+  "我的微信",
   "一下",
   "帮我",
+  "我要",
   "找一下",
   "找找",
   "找",
@@ -83,6 +87,7 @@ const FILLER_WORDS = [
   "最近的",
   "最近",
   "那个",
+  "的",
 ];
 
 export function parseFileSendIntent(text: string): FileSendIntent | null {

@@ -65,3 +65,16 @@ test("resolves a Chinese folder name after natural language intent cleanup", asy
 
   assert.deepEqual(roots, [target]);
 });
+
+test("does not treat plain file names as folder roots", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-home-"));
+  const falseRoot = path.join(home, "Desktop", "Claude", "AI");
+  fs.mkdirSync(falseRoot, { recursive: true });
+
+  const intent = parseFileSendIntent("AI小组作业收集.xlsx我要这个文件发给我");
+  assert.ok(intent);
+
+  const roots = await resolveFileQueryRoots(intent.query, { homeDir: home });
+
+  assert.deepEqual(roots, []);
+});

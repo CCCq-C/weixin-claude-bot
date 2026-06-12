@@ -88,6 +88,7 @@ export async function resolveFileQueryRoots(
 
   const homeDir = options.homeDir ?? os.homedir();
   const baseRoots = resolveBaseRoots(query, homeDir, options.roots);
+  if (!hasDirectoryCue(query)) return [];
   const keywords = extractFolderKeywords(query);
   if (keywords.length === 0 || baseRoots.length === 0) return [];
 
@@ -144,6 +145,12 @@ function resolveBaseRoots(query: string, homeDir: string, configuredRoots?: stri
   }
 
   return dedupe(roots).filter(isDirectory);
+}
+
+function hasDirectoryCue(query: string): boolean {
+  return /桌面|desktop|下载|downloads|文档|documents|文件夹|目录|里面|里的|里|下|中|包/i.test(
+    query,
+  );
 }
 
 function defaultSearchRoots(homeDir: string): string[] {
