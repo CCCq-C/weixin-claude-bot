@@ -78,8 +78,11 @@ const FILLER_WORDS = [
   "发到微信",
   "我的微信",
   "一下",
+  "你",
   "帮我",
+  "你帮我",
   "我要",
+  "哦",
   "找一下",
   "找找",
   "找",
@@ -178,6 +181,7 @@ function buildQuery(text: string): string {
     query = query.replaceAll(word, " ");
   }
   query = query
+    .replace(/第\s*(?:[一二三四五六七八九十]|\d+)\s*个/g, " ")
     .replace(/[，。！？、,.!?]/g, " ")
     .replace(/\s+/g, " ")
     .trim()

@@ -63,6 +63,20 @@ test("extracts Chinese desktop folder names from Claude folder listings", () => 
   ]);
 });
 
+test("extracts inline nested desktop folder paths from Claude summaries", () => {
+  const roots = extractFileContextRoots(
+    [
+      "桌面上没有直接的 GEO 文件夹，历史/GEO/ 下面的完整结构：",
+      "📄 根文件：",
+      "• `程千子梳理1.docx` — Word 文档",
+      "📁 `AVG/` — Avant-Garde 项目",
+    ].join("\n"),
+    { homeDir: "/Users/me" },
+  );
+
+  assert.deepEqual(roots, ["/Users/me/Desktop/历史/GEO", "/Users/me/Desktop/历史/GEO/AVG"]);
+});
+
 test("saves only existing directories and expires context", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-context-"));
   const home = path.join(dir, "home");
@@ -153,4 +167,35 @@ test("searches markdown files inside the saved package context", async () => {
 
   assert.equal(candidates.length, 1);
   assert.equal(candidates[0].path, path.join(skillDir, "SKILL.md"));
+});
+
+test("searches files inside an inline nested folder context", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-context-"));
+  const home = path.join(dir, "home");
+  const geo = path.join(home, "Desktop", "历史", "GEO");
+  const file = path.join(geo, "程千子梳理1.docx");
+  fs.mkdirSync(geo, { recursive: true });
+  fs.writeFileSync(file, "docx");
+
+  saveFileContextFromText(
+    dir,
+    "user",
+    [
+      "桌面上没有直接的 GEO 文件夹，历史/GEO/ 下面的完整结构：",
+      "• `程千子梳理1.docx` — Word 文档",
+    ].join("\n"),
+    { homeDir: home, now: new Date("2026-06-12T10:00:00.000Z") },
+  );
+
+  const context = readFileContext(dir, "user", new Date("2026-06-12T10:01:00.000Z"));
+  const candidates = await findLocalFileCandidates(
+    {
+      kind: "send",
+      query: "程千子梳理",
+      extensions: [".doc", ".docx"],
+    },
+    { roots: context?.roots ?? [], now: new Date("2026-06-12T10:01:00.000Z") },
+  );
+
+  assert.equal(candidates[0].path, file);
 });

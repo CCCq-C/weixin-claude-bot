@@ -83,6 +83,13 @@ test("maps html wording to html files", () => {
   assert.deepEqual(intent.extensions, [".html", ".htm"]);
 });
 
+test("cleans ordinal and casual words from contextual file requests", () => {
+  const intent = parseFileSendIntent("哦，帮我把第一个那个程千子梳理发给我");
+
+  assert.equal(intent?.kind, "send");
+  assert.equal(intent.query, "程千子梳理");
+});
+
 test("parses replies for pending file selection", () => {
   assert.deepEqual(parseFileSelectionReply("第 2 个"), { type: "select", index: 1 });
   assert.deepEqual(parseFileSelectionReply("第一个"), { type: "select", index: 0 });

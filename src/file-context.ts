@@ -40,6 +40,9 @@ export function extractFileContextRoots(
     if (root) roots.add(root);
   }
 
+  for (const folderName of extractInlineDesktopFolderPaths(text)) {
+    roots.add(path.join(homeDir, "Desktop", folderName));
+  }
   if (/桌面|Desktop|文件夹内容|目录内容|里有\s*\d*\s*个文件/i.test(text)) {
     for (const folderName of extractDesktopFolderNames(text)) {
       roots.add(path.join(homeDir, "Desktop", folderName));
@@ -114,6 +117,11 @@ function extractDesktopFolderNames(text: string): string[] {
 
   let parentFolder: string | null = null;
   for (const line of text.split("\n")) {
+    const inlinePaths = extractInlineDesktopFolderPaths(line);
+    if (inlinePaths.length > 0) {
+      parentFolder = inlinePaths[inlinePaths.length - 1] ?? parentFolder;
+    }
+
     const folderName = extractFolderNameFromListingLine(line);
     if (!folderName || folderName.startsWith(".")) continue;
 
@@ -128,9 +136,21 @@ function extractDesktopFolderNames(text: string): string[] {
   return [...names];
 }
 
+function extractInlineDesktopFolderPaths(text: string): string[] {
+  const paths = new Set<string>();
+  const inlinePathPattern =
+    /(?:^|[\s`，。；;：:、])`?([\p{Script=Han}A-Za-z0-9._:-]+(?:\/[\p{Script=Han}A-Za-z0-9._:-]+)+)\/`?/gu;
+  for (const match of text.matchAll(inlinePathPattern)) {
+    const value = match[1]?.trim();
+    if (!value || value.startsWith(".")) continue;
+    paths.add(value);
+  }
+  return [...paths];
+}
+
 function extractFolderNameFromListingLine(line: string): string | null {
   const match = line.match(
-    /^\s*(?:[-*•]\s*)?(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、]?)?\s*`?([^`/\n]+?)\/`?(?:\s|$|[—-])/u,
+    /^\s*(?:[-*•]\s*)?(?:📁\s*)?(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、]?)?\s*`?([^`/\n]+?)\/`?(?:\s|$|[—-])/u,
   );
   const name = match?.[1]?.trim();
   return name || null;
