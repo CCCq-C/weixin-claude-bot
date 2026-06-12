@@ -28,6 +28,7 @@ import {
   type FileSendIntent,
 } from "./file-intent.js";
 import { findLocalFileCandidates } from "./local-file-finder.js";
+import { resolveFileQueryRoots } from "./file-query-roots.js";
 import {
   buildCandidateReply,
   hasHighRiskCandidate,
@@ -93,8 +94,21 @@ async function startFileSearch(params: {
 }): Promise<void> {
   const context = readFileContext("data", params.userId);
   let candidates: FileCandidate[] = [];
+  const explicitRoots = await resolveFileQueryRoots(params.intent.query);
 
-  if (context?.roots.length && shouldUseFileContext(params.intent.query)) {
+  if (explicitRoots.length > 0) {
+    candidates = await findLocalFileCandidates(params.intent, {
+      roots: explicitRoots,
+      timeoutMs: 5000,
+      maxScanned: 10_000,
+      preserveRootOrder: true,
+    });
+  }
+  if (
+    candidates.length === 0 &&
+    context?.roots.length &&
+    shouldUseFileContext(params.intent.query)
+  ) {
     candidates = await findLocalFileCandidates(params.intent, {
       roots: context.roots,
       timeoutMs: 5000,
