@@ -22,6 +22,24 @@ import {
 } from "./wechat-task-messages.js";
 import { acquireInstanceLock } from "./instance-lock.js";
 import { prepareResultDelivery } from "./result-delivery.js";
+import {
+  parseFileSelectionReply,
+  parseFileSendIntent,
+  type FileSendIntent,
+} from "./file-intent.js";
+import { findLocalFileCandidates } from "./local-file-finder.js";
+import {
+  buildCandidateReply,
+  hasHighRiskCandidate,
+  type FileCandidate,
+} from "./file-search.js";
+import {
+  clearPendingFileSend,
+  readPendingFileSend,
+  savePendingFileSend,
+  type PendingFileSend,
+} from "./pending-file-send.js";
+import { sendLocalFileAttachment } from "./weixin-media.js";
 
 const WECHAT_CHUNK = 3500; // 单条文本上限保守值
 
@@ -30,6 +48,124 @@ function splitForWechat(s: string, n: number = WECHAT_CHUNK): string[] {
   const out: string[] = [];
   for (let i = 0; i < s.length; i += n) out.push(s.slice(i, i + n));
   return out;
+}
+
+function saveFileCandidates(
+  userId: string,
+  query: string,
+  candidates: FileCandidate[],
+): PendingFileSend {
+  const pending: PendingFileSend = {
+    query,
+    candidates,
+    selectedIndex: candidates.length === 1 ? 0 : undefined,
+    highRisk: hasHighRiskCandidate(candidates),
+  };
+  savePendingFileSend("data", userId, pending);
+  return pending;
+}
+
+async function replyText(
+  baseUrl: string,
+  botToken: string,
+  toUserId: string,
+  text: string,
+  contextToken: string,
+): Promise<void> {
+  try {
+    await sendText(baseUrl, botToken, toUserId, text, contextToken);
+  } catch (e: unknown) {
+    console.error(`[send] 文件流程文本回复失败: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+async function startFileSearch(params: {
+  intent: FileSendIntent;
+  userId: string;
+  baseUrl: string;
+  botToken: string;
+  contextToken: string;
+}): Promise<void> {
+  const candidates = await findLocalFileCandidates(params.intent);
+  if (candidates.length === 0) {
+    await replyText(
+      params.baseUrl,
+      params.botToken,
+      params.userId,
+      buildCandidateReply([], { query: params.intent.query, highRisk: false }),
+      params.contextToken,
+    );
+    return;
+  }
+
+  const pending = saveFileCandidates(params.userId, params.intent.query, candidates);
+  await replyText(
+    params.baseUrl,
+    params.botToken,
+    params.userId,
+    buildCandidateReply(candidates, {
+      query: params.intent.query,
+      highRisk: pending.highRisk,
+    }),
+    params.contextToken,
+  );
+}
+
+async function sendConfirmedFile(params: {
+  pending: PendingFileSend;
+  index: number;
+  userId: string;
+  baseUrl: string;
+  botToken: string;
+  contextToken: string;
+}): Promise<void> {
+  const candidate = params.pending.candidates[params.index];
+  if (!candidate) {
+    await replyText(
+      params.baseUrl,
+      params.botToken,
+      params.userId,
+      "这个序号不在候选列表里，请重新回复候选序号，或回复“取消”。",
+      params.contextToken,
+    );
+    return;
+  }
+
+  await replyText(
+    params.baseUrl,
+    params.botToken,
+    params.userId,
+    `已确认，正在发送：${candidate.name}`,
+    params.contextToken,
+  );
+
+  try {
+    await sendLocalFileAttachment({
+      baseUrl: params.baseUrl,
+      botToken: params.botToken,
+      toUserId: params.userId,
+      filePath: candidate.path,
+      contextToken: params.contextToken,
+    });
+    clearPendingFileSend("data", params.userId);
+    await replyText(
+      params.baseUrl,
+      params.botToken,
+      params.userId,
+      "发送完成。",
+      params.contextToken,
+    );
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    clearPendingFileSend("data", params.userId);
+    await replyText(
+      params.baseUrl,
+      params.botToken,
+      params.userId,
+      `附件发送失败：${message}`,
+      params.contextToken,
+    );
+  }
 }
 
 async function main(): Promise<void> {
@@ -115,6 +251,111 @@ async function main(): Promise<void> {
     console.log(`[recv] ${from}: ${text}`);
     updateStatus("data", { lastMessageAt: new Date().toISOString() });
     appendEvent("data", "message-received", { from });
+
+    const pendingFileSend = readPendingFileSend("data", from);
+    if (pendingFileSend) {
+      const selection = parseFileSelectionReply(text);
+      if (selection?.type === "cancel") {
+        clearPendingFileSend("data", from);
+        await replyText(account.baseUrl, account.botToken, from, "已取消文件发送。", ctx);
+        appendEvent("data", "file-send-cancelled", { from });
+        continue;
+      }
+      if (selection?.type === "select") {
+        const candidate = pendingFileSend.candidates[selection.index];
+        if (!candidate) {
+          await replyText(
+            account.baseUrl,
+            account.botToken,
+            from,
+            "这个序号不在候选列表里，请重新回复候选序号，或回复“取消”。",
+            ctx,
+          );
+          continue;
+        }
+        if (pendingFileSend.highRisk) {
+          const nextPending: PendingFileSend = {
+            query: pendingFileSend.query,
+            candidates: [candidate],
+            selectedIndex: 0,
+            highRisk: true,
+          };
+          savePendingFileSend("data", from, nextPending);
+          await replyText(
+            account.baseUrl,
+            account.botToken,
+            from,
+            `你选择的是敏感文件：${candidate.name}\n请再次回复“确认”后发送，或回复“取消”。`,
+            ctx,
+          );
+          continue;
+        }
+        await sendConfirmedFile({
+          pending: pendingFileSend,
+          index: selection.index,
+          userId: from,
+          baseUrl: account.baseUrl,
+          botToken: account.botToken,
+          contextToken: ctx,
+        });
+        appendEvent("data", "file-send-confirmed", { from });
+        continue;
+      }
+      if (selection?.type === "confirm") {
+        const index =
+          pendingFileSend.selectedIndex ??
+          (pendingFileSend.candidates.length === 1 ? 0 : undefined);
+        if (typeof index !== "number") {
+          await replyText(
+            account.baseUrl,
+            account.botToken,
+            from,
+            "我还不能确定你要发哪一个，请回复候选序号，或补充关键词继续找。",
+            ctx,
+          );
+          continue;
+        }
+        await sendConfirmedFile({
+          pending: pendingFileSend,
+          index,
+          userId: from,
+          baseUrl: account.baseUrl,
+          botToken: account.botToken,
+          contextToken: ctx,
+        });
+        appendEvent("data", "file-send-confirmed", { from });
+        continue;
+      }
+
+      const parsedRefinement = parseFileSendIntent(text);
+      const refinedIntent: FileSendIntent = parsedRefinement ?? {
+        kind: "send",
+        query: `${pendingFileSend.query} ${text}`.trim(),
+        extensions: [],
+      };
+      await startFileSearch({
+        intent: refinedIntent,
+        userId: from,
+        baseUrl: account.baseUrl,
+        botToken: account.botToken,
+        contextToken: ctx,
+      });
+      appendEvent("data", "file-send-refined", { from });
+      continue;
+    }
+
+    const fileIntent = parseFileSendIntent(text);
+    if (fileIntent) {
+      await startFileSearch({
+        intent: fileIntent,
+        userId: from,
+        baseUrl: account.baseUrl,
+        botToken: account.botToken,
+        contextToken: ctx,
+      });
+      appendEvent("data", "file-send-search-started", { from });
+      continue;
+    }
 
     const command = parseBotCommand(text);
     if (command) {
