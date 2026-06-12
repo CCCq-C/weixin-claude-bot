@@ -64,6 +64,78 @@ test("uses time hints when ranking candidates", () => {
   assert.equal(ranked[0].name, "报价表-B.xlsx");
 });
 
+test("does not rank unrelated files by recency or preferred directory alone", () => {
+  const ranked = rankFileCandidates(
+    [
+      {
+        path: "/Users/me/Desktop/douyin-skill-small-offline-package/README.md",
+        name: "README.md",
+        size: 1200,
+        modifiedAt: new Date("2026-06-12T03:00:00Z"),
+      },
+      {
+        path: "/Users/me/Desktop/douyin-skill-small-offline-package/model.bin",
+        name: "model.bin",
+        size: 1200,
+        modifiedAt: new Date("2026-06-12T03:30:00Z"),
+      },
+    ],
+    {
+      query: "html",
+      extensions: [".html", ".htm"],
+      now: new Date("2026-06-12T04:00:00Z"),
+    },
+  );
+
+  assert.deepEqual(ranked, []);
+});
+
+test("keeps matching html files when searching for html", () => {
+  const ranked = rankFileCandidates(
+    [
+      {
+        path: "/Users/me/Desktop/CodeX/小黄Html/geo.html",
+        name: "geo.html",
+        size: 1200,
+        modifiedAt: new Date("2026-06-12T03:00:00Z"),
+      },
+    ],
+    {
+      query: "html",
+      extensions: [".html", ".htm"],
+      now: new Date("2026-06-12T04:00:00Z"),
+    },
+  );
+
+  assert.equal(ranked[0].name, "geo.html");
+});
+
+test("allows pure time-hint searches to rank by date", () => {
+  const ranked = rankFileCandidates(
+    [
+      {
+        path: "/Users/me/Desktop/A.xlsx",
+        name: "A.xlsx",
+        size: 1200,
+        modifiedAt: new Date("2026-06-10T03:00:00Z"),
+      },
+      {
+        path: "/Users/me/Desktop/B.xlsx",
+        name: "B.xlsx",
+        size: 1200,
+        modifiedAt: new Date("2026-06-11T03:00:00Z"),
+      },
+    ],
+    {
+      query: "昨天",
+      now: new Date("2026-06-12T04:00:00Z"),
+    },
+  );
+
+  assert.equal(ranked[0].name, "B.xlsx");
+});
+
+
 test("builds a candidate reply that asks the user to choose", () => {
   const reply = buildCandidateReply(files.slice(0, 2), {
     query: "报价",

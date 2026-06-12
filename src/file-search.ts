@@ -103,20 +103,40 @@ function scoreCandidate(
   const lowerName = file.name.toLowerCase();
   const lowerPath = file.path.toLowerCase();
   const ext = path.extname(file.name).toLowerCase();
+  if (expectedExtensions.size > 0 && !expectedExtensions.has(ext)) return 0;
+
   let score = 0;
+  let evidenceScore = 0;
 
   for (const token of tokens) {
-    if (lowerName.includes(token)) score += token.length >= 2 ? 80 : 30;
-    else if (lowerPath.includes(token)) score += 25;
+    if (isTimeToken(token)) continue;
+    if (lowerName.includes(token)) {
+      const tokenScore = token.length >= 2 ? 80 : 30;
+      score += tokenScore;
+      evidenceScore += tokenScore;
+    } else if (lowerPath.includes(token)) {
+      score += 25;
+      evidenceScore += 25;
+    }
   }
 
-  if (tokens.length > 0 && lowerName.includes(tokens.join(""))) score += 40;
-  if (expectedExtensions.size > 0 && expectedExtensions.has(ext)) score += 50;
+  if (tokens.length > 0 && lowerName.includes(tokens.join(""))) {
+    score += 40;
+    evidenceScore += 40;
+  }
+  if (expectedExtensions.size > 0 && expectedExtensions.has(ext)) {
+    score += 50;
+    evidenceScore += 50;
+  }
+
+  const timeScore = scoreTimeHint(file.modifiedAt, now, timeHint);
+  if (evidenceScore <= 0 && timeScore <= 0) return 0;
+
   if (PREFERRED_DIR_PATTERN.test(file.path)) score += 10;
 
   const ageHours = Math.max(0, (now.getTime() - file.modifiedAt.getTime()) / 3_600_000);
   score += Math.max(0, 30 - Math.min(30, ageHours / 24));
-  score += scoreTimeHint(file.modifiedAt, now, timeHint);
+  score += timeScore;
 
   return score;
 }
@@ -130,6 +150,10 @@ function detectTimeHint(query: string): TimeHint {
   if (query.includes("上周") || query.includes("上星期")) return "last-week";
   if (query.includes("最近") || query.includes("最新")) return "recent";
   return null;
+}
+
+function isTimeToken(token: string): boolean {
+  return ["今天", "昨天", "前天", "上周", "上星期", "最近", "最新"].includes(token);
 }
 
 function scoreTimeHint(modifiedAt: Date, now: Date, hint: TimeHint): number {

@@ -12,6 +12,7 @@ export type FileSelectionReply =
   | { type: "cancel" };
 
 const FILE_WORD_EXTENSIONS: Array<{ words: string[]; extensions: string[] }> = [
+  { words: ["html", "htm", "网页"], extensions: [".html", ".htm"] },
   { words: ["ppt", "pptx", "课件", "幻灯片"], extensions: [".ppt", ".pptx"] },
   { words: ["excel", "xlsx", "xls", "表格"], extensions: [".xls", ".xlsx"] },
   { words: ["word", "docx", "doc", "文档"], extensions: [".doc", ".docx"] },

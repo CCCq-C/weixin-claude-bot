@@ -75,6 +75,14 @@ test("cleans spoken suffixes from exact file name requests", () => {
   assert.deepEqual(intent.extensions, [".xls", ".xlsx"]);
 });
 
+test("maps html wording to html files", () => {
+  const intent = parseFileSendIntent("帮我把这个 HTML 发给我");
+
+  assert.equal(intent?.kind, "send");
+  assert.equal(intent.query, "html");
+  assert.deepEqual(intent.extensions, [".html", ".htm"]);
+});
+
 test("parses replies for pending file selection", () => {
   assert.deepEqual(parseFileSelectionReply("第 2 个"), { type: "select", index: 1 });
   assert.deepEqual(parseFileSelectionReply("第一个"), { type: "select", index: 0 });

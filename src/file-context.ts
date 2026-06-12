@@ -40,7 +40,7 @@ export function extractFileContextRoots(
     if (root) roots.add(root);
   }
 
-  if (/桌面|Desktop|文件夹内容|目录内容/i.test(text)) {
+  if (/桌面|Desktop|文件夹内容|目录内容|里有\s*\d*\s*个文件/i.test(text)) {
     for (const folderName of extractDesktopFolderNames(text)) {
       roots.add(path.join(homeDir, "Desktop", folderName));
     }
@@ -55,20 +55,19 @@ export function saveFileContextFromText(
   text: string,
   options: SaveContextOptions = {},
 ): void {
-  const roots = extractFileContextRoots(text, options).filter((root) => {
-    try {
-      return fs.statSync(root).isDirectory();
-    } catch {
-      return false;
-    }
-  });
+  const now = options.now ?? new Date();
+  const previousRoots = readFileContext(dataDir, userId, now)?.roots ?? [];
+  const roots = resolveExistingContextRoots(
+    extractFileContextRoots(text, options),
+    previousRoots,
+  );
   if (roots.length === 0) return;
 
   const file = contextFilePath(dataDir, userId);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const stored: StoredFileContext = {
     roots: roots.slice(0, 10),
-    createdAt: (options.now ?? new Date()).toISOString(),
+    createdAt: now.toISOString(),
   };
   fs.writeFileSync(file, JSON.stringify(stored, null, 2), "utf-8");
 }
@@ -135,6 +134,37 @@ function extractFolderNameFromListingLine(line: string): string | null {
   );
   const name = match?.[1]?.trim();
   return name || null;
+}
+
+function resolveExistingContextRoots(rawRoots: string[], previousRoots: string[]): string[] {
+  const roots = new Set<string>();
+  for (const root of rawRoots) {
+    const existing = resolveExistingContextRoot(root, previousRoots);
+    if (existing) roots.add(existing);
+  }
+  return [...roots];
+}
+
+function resolveExistingContextRoot(root: string, previousRoots: string[]): string | null {
+  if (isExistingDirectory(root)) return root;
+
+  const leafName = path.basename(root);
+  const exactPrevious = previousRoots.find((previous) => path.basename(previous) === leafName);
+  if (exactPrevious && isExistingDirectory(exactPrevious)) return exactPrevious;
+
+  for (const previous of previousRoots) {
+    const child = path.join(previous, leafName);
+    if (isExistingDirectory(child)) return child;
+  }
+  return null;
+}
+
+function isExistingDirectory(root: string): boolean {
+  try {
+    return fs.statSync(root).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function expandHome(value: string, homeDir: string): string {

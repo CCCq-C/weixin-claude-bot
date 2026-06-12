@@ -86,6 +86,36 @@ test("saves only existing directories and expires context", () => {
   assert.equal(readFileContext(dir, "user", new Date("2026-06-12T11:01:00.000Z")), null);
 });
 
+test("updates context to a folder opened from the previous listing", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-context-"));
+  const home = path.join(dir, "home");
+  const codex = path.join(home, "Desktop", "CodeX");
+  const htmlDir = path.join(codex, "小黄Html");
+  fs.mkdirSync(htmlDir, { recursive: true });
+
+  saveFileContextFromText(
+    dir,
+    "user",
+    [
+      "`CodeX/` 文件夹内容：",
+      "• `OpenMAIC/` — 38 个项目，看起来是核心项目",
+      "• `小黄Html/` — 小黄相关 HTML",
+    ].join("\n"),
+    { homeDir: home, now: new Date("2026-06-12T10:00:00.000Z") },
+  );
+  saveFileContextFromText(
+    dir,
+    "user",
+    ["小黄Html/ 里有 3 个文件：", "• `geo.html` — HTML 页面"].join("\n"),
+    { homeDir: home, now: new Date("2026-06-12T10:01:00.000Z") },
+  );
+
+  assert.deepEqual(
+    readFileContext(dir, "user", new Date("2026-06-12T10:02:00.000Z"))?.roots,
+    [htmlDir],
+  );
+});
+
 test("uses context only for contextual file requests", () => {
   assert.equal(shouldUseFileContext("这个包里面的 md 文件"), true);
   assert.equal(shouldUseFileContext("把文件发给我手机上"), true);
