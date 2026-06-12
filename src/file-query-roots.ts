@@ -160,11 +160,45 @@ function extractFolderKeywords(query: string): string[] {
     .replace(/[，。！？、,.!?]/g, " ")
     .replace(/[“”"'`]/g, " ")
     .toLowerCase();
+  const keywords = new Set<string>();
+  for (const phrase of extractPhraseKeywords(normalized)) {
+    keywords.add(phrase);
+  }
   const tokens = normalized
     .match(/[a-z0-9][a-z0-9._-]{1,}/g)
     ?.map((token) => token.trim())
     .filter((token) => token.length >= 2 && !TOKEN_STOP_WORDS.has(token));
-  return dedupe(tokens ?? []);
+  for (const token of tokens ?? []) {
+    keywords.add(token);
+  }
+  return [...keywords].sort((a, b) => b.length - a.length);
+}
+
+function extractPhraseKeywords(text: string): string[] {
+  const keywords: string[] = [];
+  const patterns = [
+    /(?:^|\s)([\p{Script=Han}a-z0-9._\-\s]{2,}?)\s*(?:里|下|中)/giu,
+    /(?:桌面上?|下载里?|文档里?)\s*([\p{Script=Han}a-z0-9._\-\s]{2,})/giu,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const cleaned = cleanPhraseKeyword(match[1] ?? "");
+      if (cleaned) keywords.push(cleaned);
+    }
+  }
+  return dedupe(keywords);
+}
+
+function cleanPhraseKeyword(phrase: string): string {
+  return phrase
+    .replace(
+      /桌面|下载|文档|desktop|downloads|documents|文件夹|目录|文件|里面|里的|那个|这个|发我|发给我|发过来|发送|传给我|帮我|我要|我需要|需要|给我|上|下|中|的|包/gi,
+      " ",
+    )
+    .replace(/\b(md|markdown|pdf|docx?|xlsx?|pptx?|png|jpe?g|mp4|mov)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function scanDirectoryRoots(
