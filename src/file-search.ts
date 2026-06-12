@@ -183,5 +183,11 @@ function formatModifiedTime(date: Date): string {
 }
 
 function displayLocation(filePath: string): string {
-  return path.basename(path.dirname(filePath)) || path.dirname(filePath);
+  const dir = path.dirname(filePath);
+  const parts = dir.split(/[\\/]+/).filter(Boolean);
+  const commonIndex = parts.findIndex((part) =>
+    ["Desktop", "Downloads", "Documents", "Obsidian"].includes(part),
+  );
+  if (commonIndex >= 0) return parts.slice(commonIndex).join("/");
+  return parts.slice(-3).join("/") || dir;
 }

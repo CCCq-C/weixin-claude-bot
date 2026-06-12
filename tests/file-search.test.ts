@@ -76,6 +76,22 @@ test("builds a candidate reply that asks the user to choose", () => {
   assert.match(reply, /直接发其他任务会自动退出文件流程/);
 });
 
+test("shows enough path context in candidate replies", () => {
+  const reply = buildCandidateReply(
+    [
+      {
+        path: "/Users/me/Desktop/douyin-skill-small-offline-package/skill/SKILL.md",
+        name: "SKILL.md",
+        size: 3000,
+        modifiedAt: new Date("2026-06-12T10:00:00Z"),
+      },
+    ],
+    { query: "md", highRisk: false },
+  );
+
+  assert.match(reply, /douyin-skill-small-offline-package\/skill/);
+});
+
 test("flags sensitive file names", () => {
   assert.equal(isSensitiveFileName("api-token.txt"), true);
   assert.equal(isSensitiveFileName("身份证扫描件.pdf"), true);

@@ -40,6 +40,11 @@ import {
   type PendingFileSend,
 } from "./pending-file-send.js";
 import { sendLocalFileAttachment } from "./weixin-media.js";
+import {
+  readFileContext,
+  saveFileContextFromText,
+  shouldUseFileContext,
+} from "./file-context.js";
 
 const WECHAT_CHUNK = 3500; // 单条文本上限保守值
 
@@ -86,7 +91,19 @@ async function startFileSearch(params: {
   botToken: string;
   contextToken: string;
 }): Promise<void> {
-  const candidates = await findLocalFileCandidates(params.intent);
+  const context = readFileContext("data", params.userId);
+  let candidates: FileCandidate[] = [];
+
+  if (context?.roots.length && shouldUseFileContext(params.intent.query)) {
+    candidates = await findLocalFileCandidates(params.intent, {
+      roots: context.roots,
+      timeoutMs: 5000,
+      maxScanned: 10_000,
+    });
+  }
+  if (candidates.length === 0) {
+    candidates = await findLocalFileCandidates(params.intent);
+  }
   if (candidates.length === 0) {
     await replyText(
       params.baseUrl,
@@ -420,6 +437,7 @@ async function main(): Promise<void> {
       }
       const elapsed = Math.round((Date.now() - t0) / 1000);
       console.log(`[claude] ${elapsed}s, ${result.length} chars`);
+      saveFileContextFromText("data", from, `${text}\n${result}`);
 
       let resultDelivered = true;
       let chunks: string[];

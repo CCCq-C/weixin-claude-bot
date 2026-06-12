@@ -15,6 +15,7 @@ const FILE_WORD_EXTENSIONS: Array<{ words: string[]; extensions: string[] }> = [
   { words: ["ppt", "pptx", "课件", "幻灯片"], extensions: [".ppt", ".pptx"] },
   { words: ["excel", "xlsx", "xls", "表格"], extensions: [".xls", ".xlsx"] },
   { words: ["word", "docx", "doc", "文档"], extensions: [".doc", ".docx"] },
+  { words: ["md", "markdown", "markdown文件"], extensions: [".md", ".markdown"] },
   { words: ["pdf"], extensions: [".pdf"] },
   { words: ["图片", "照片", "png", "jpg", "jpeg"], extensions: [".png", ".jpg", ".jpeg"] },
   { words: ["视频", "mp4", "mov"], extensions: [".mp4", ".mov"] },

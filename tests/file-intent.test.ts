@@ -46,6 +46,13 @@ test("detects search-only file requests and maps file type words", () => {
   assert.deepEqual(intent.extensions, [".ppt", ".pptx"]);
 });
 
+test("maps markdown file words to md extensions", () => {
+  const intent = parseFileSendIntent("把这个包里面的 md 文件发给我");
+
+  assert.equal(intent?.kind, "send");
+  assert.deepEqual(intent.extensions, [".md", ".markdown"]);
+});
+
 test("parses replies for pending file selection", () => {
   assert.deepEqual(parseFileSelectionReply("第 2 个"), { type: "select", index: 1 });
   assert.deepEqual(parseFileSelectionReply("确认"), { type: "confirm" });
