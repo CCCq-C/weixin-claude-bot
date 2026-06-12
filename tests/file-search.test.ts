@@ -73,6 +73,7 @@ test("builds a candidate reply that asks the user to choose", () => {
   assert.match(reply, /我找到 2 个可能的文件/);
   assert.match(reply, /1\. 客户报价表\.xlsx/);
   assert.match(reply, /回复序号确认发送/);
+  assert.match(reply, /直接发其他任务会自动退出文件流程/);
 });
 
 test("flags sensitive file names", () => {

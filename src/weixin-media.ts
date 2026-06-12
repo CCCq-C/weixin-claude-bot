@@ -96,7 +96,7 @@ export async function uploadBufferToCdn(params: {
       "Content-Type": "application/octet-stream",
       "Content-Length": String(encrypted.length),
     },
-    body: encrypted as unknown as BodyInit,
+    body: new Uint8Array(encrypted),
   });
 
   if (!res.ok) {
@@ -246,7 +246,7 @@ function buildCdnUploadUrl(
 function buildCdnMedia(uploaded: UploadedMediaInfo): WeixinCdnMedia {
   return {
     encrypt_query_param: uploaded.downloadEncryptedQueryParam,
-    aes_key: Buffer.from(uploaded.aeskeyHex, "hex").toString("base64"),
+    aes_key: Buffer.from(uploaded.aeskeyHex).toString("base64"),
     encrypt_type: 1,
   };
 }

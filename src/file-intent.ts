@@ -104,7 +104,7 @@ export function parseFileSelectionReply(text: string): FileSelectionReply | null
   const normalized = normalizeText(text);
   if (!normalized) return null;
 
-  if (/^(取消|算了|不用了|不要了|cancel|\/cancel|\/stop)$/i.test(normalized)) {
+  if (/^(取消|算了|不用了|不要了|别找了|不要找了|不找了|停止找|cancel|\/cancel|\/stop)$/i.test(normalized)) {
     return { type: "cancel" };
   }
   if (/^(确认|确定|就这个|发送|发吧|可以|是的|对)$/i.test(normalized)) {

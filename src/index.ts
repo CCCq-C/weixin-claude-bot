@@ -328,20 +328,20 @@ async function main(): Promise<void> {
       }
 
       const parsedRefinement = parseFileSendIntent(text);
-      const refinedIntent: FileSendIntent = parsedRefinement ?? {
-        kind: "send",
-        query: `${pendingFileSend.query} ${text}`.trim(),
-        extensions: [],
-      };
-      await startFileSearch({
-        intent: refinedIntent,
-        userId: from,
-        baseUrl: account.baseUrl,
-        botToken: account.botToken,
-        contextToken: ctx,
-      });
-      appendEvent("data", "file-send-refined", { from });
-      continue;
+      if (parsedRefinement) {
+        await startFileSearch({
+          intent: parsedRefinement,
+          userId: from,
+          baseUrl: account.baseUrl,
+          botToken: account.botToken,
+          contextToken: ctx,
+        });
+        appendEvent("data", "file-send-refined", { from });
+        continue;
+      }
+
+      clearPendingFileSend("data", from);
+      appendEvent("data", "file-send-dismissed-by-new-message", { from });
     }
 
     const fileIntent = parseFileSendIntent(text);

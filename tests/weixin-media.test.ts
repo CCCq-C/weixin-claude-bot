@@ -31,6 +31,10 @@ test("builds file image and video message items", () => {
   assert.equal(fileItem.type, 4);
   assert.equal(fileItem.file_item?.file_name, "报价表.xlsx");
   assert.equal(fileItem.file_item?.len, "1234");
+  assert.equal(
+    fileItem.file_item?.media.aes_key,
+    Buffer.from(uploaded.aeskeyHex).toString("base64"),
+  );
 
   const imageItem = buildMediaMessageItem("image", uploaded, "photo.png");
   assert.equal(imageItem.type, 2);
@@ -49,7 +53,7 @@ test("calculates AES-128-ECB padded size", () => {
 
 test("uploads encrypted bytes to CDN and requires x-encrypted-param", async () => {
   const aesKey = crypto.randomBytes(16);
-  const calls: Array<{ url: string; method?: string }> = [];
+  const calls: Array<{ url: string; method?: string; body: unknown }> = [];
 
   await assert.rejects(
     uploadBufferToCdn({
@@ -58,7 +62,7 @@ test("uploads encrypted bytes to CDN and requires x-encrypted-param", async () =
       filekey: "file-key",
       aesKey,
       fetchImpl: async (url, init) => {
-        calls.push({ url: String(url), method: init?.method });
+        calls.push({ url: String(url), method: init?.method, body: init?.body });
         return new Response("ok");
       },
     }),
@@ -67,6 +71,7 @@ test("uploads encrypted bytes to CDN and requires x-encrypted-param", async () =
 
   assert.equal(calls[0].method, "POST");
   assert.match(calls[0].url, /encrypted_query_param=upload-param/);
+  assert.equal(calls[0].body instanceof Uint8Array, true);
 
   const uploadedInfo = await uploadBufferToCdn({
     buffer: Buffer.from("hello"),

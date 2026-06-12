@@ -64,7 +64,7 @@ export function buildCandidateReply(
     return [
       `我找到：${formatCandidate(candidates[0])}`,
       `${warning}`,
-      "回复“确认”后发送，或回复“取消”。",
+      "回复“确认”后发送；直接发其他任务会自动退出文件流程。",
     ]
       .filter(Boolean)
       .join("\n");
@@ -79,7 +79,7 @@ export function buildCandidateReply(
     "",
     ...lines,
     warning,
-    "回复序号确认发送，或补充关键词继续找。",
+    "回复序号确认发送，或补充关键词继续找；直接发其他任务会自动退出文件流程。",
   ]
     .filter((line) => line !== "")
     .join("\n");
