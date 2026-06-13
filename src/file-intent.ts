@@ -4,6 +4,7 @@ export type FileSendIntent = {
   kind: FileIntentKind;
   query: string;
   extensions: string[];
+  rawText?: string;
 };
 
 export type FileSelectionReply =
@@ -106,7 +107,7 @@ export function parseFileSendIntent(text: string): FileSendIntent | null {
   const debugMatch = normalized.match(/^\/sendfile\s+(.+)$/i);
   if (debugMatch?.[1]) {
     const query = debugMatch[1].trim();
-    return { kind: "send", query, extensions: detectExtensions(query) };
+    return { kind: "send", query, extensions: detectExtensions(query), rawText: normalized };
   }
   if (NON_SEND_PATTERNS.some((pattern) => pattern.test(normalized))) return null;
 
@@ -117,7 +118,7 @@ export function parseFileSendIntent(text: string): FileSendIntent | null {
   const query = buildQuery(normalized);
   if (!query && extensions.length === 0) return null;
 
-  return { kind, query: query || normalized, extensions };
+  return { kind, query: query || normalized, extensions, rawText: normalized };
 }
 
 export function parseFileSelectionReply(text: string): FileSelectionReply | null {

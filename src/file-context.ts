@@ -60,10 +60,14 @@ export function saveFileContextFromText(
 ): void {
   const now = options.now ?? new Date();
   const previousRoots = readFileContext(dataDir, userId, now)?.roots ?? [];
-  const roots = resolveExistingContextRoots(
+  let roots = resolveExistingContextRoots(
     extractFileContextRoots(text, options),
     previousRoots,
   );
+  if (roots.length === 0) {
+    const selectedRoot = resolveOrdinalNavigationRoot(text, previousRoots);
+    if (selectedRoot) roots = [selectedRoot];
+  }
   if (roots.length === 0) return;
 
   const file = contextFilePath(dataDir, userId);
@@ -177,6 +181,49 @@ function resolveExistingContextRoot(root: string, previousRoots: string[]): stri
     if (isExistingDirectory(child)) return child;
   }
   return null;
+}
+
+function resolveOrdinalNavigationRoot(text: string, previousRoots: string[]): string | null {
+  if (previousRoots.length === 0) return null;
+
+  const index = parseOrdinalNavigationIndex(text);
+  if (typeof index !== "number") return null;
+
+  const candidates = selectableContextRoots(previousRoots);
+  return candidates[index] ?? null;
+}
+
+function parseOrdinalNavigationIndex(text: string): number | null {
+  const match = text.match(
+    /(?:打开|进入|进到|点开|查看|看一下)\s*(?:第\s*)?([1-9]\d*|[一二三四五六七八九十])\s*个/u,
+  );
+  const value = match?.[1];
+  if (!value) return null;
+  if (/^\d+$/.test(value)) return Number(value) - 1;
+
+  const indexMap: Record<string, number> = {
+    一: 0,
+    二: 1,
+    三: 2,
+    四: 3,
+    五: 4,
+    六: 5,
+    七: 6,
+    八: 7,
+    九: 8,
+    十: 9,
+  };
+  return indexMap[value] ?? null;
+}
+
+function selectableContextRoots(previousRoots: string[]): string[] {
+  const parent = previousRoots.find((root) =>
+    previousRoots.some((candidate) => path.dirname(candidate) === root),
+  );
+  if (!parent) return previousRoots;
+
+  const directChildren = previousRoots.filter((root) => path.dirname(root) === parent);
+  return directChildren.length > 0 ? directChildren : previousRoots;
 }
 
 function isExistingDirectory(root: string): boolean {

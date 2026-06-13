@@ -130,6 +130,41 @@ test("updates context to a folder opened from the previous listing", () => {
   );
 });
 
+test("updates context when user opens an ordinal folder and Claude omits the path", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-context-"));
+  const home = path.join(dir, "home");
+  const codex = path.join(home, "Desktop", "CodeX");
+  const first = path.join(codex, "OpenMAIC");
+  const second = path.join(codex, "小黄Html");
+  const third = path.join(codex, "排班02");
+  fs.mkdirSync(first, { recursive: true });
+  fs.mkdirSync(second, { recursive: true });
+  fs.mkdirSync(third, { recursive: true });
+
+  saveFileContextFromText(
+    dir,
+    "user",
+    [
+      "`CodeX/` 文件夹内容：",
+      "• `OpenMAIC/` — 38 个项目，看起来是核心项目",
+      "• `小黄Html/` — 小黄相关 HTML",
+      "• `排班02/` — 排班页面",
+    ].join("\n"),
+    { homeDir: home, now: new Date("2026-06-12T10:00:00.000Z") },
+  );
+  saveFileContextFromText(
+    dir,
+    "user",
+    "打开第二个\n已经在 Finder 里打开了。里面有什么需要我读的吗？",
+    { homeDir: home, now: new Date("2026-06-12T10:01:00.000Z") },
+  );
+
+  assert.deepEqual(
+    readFileContext(dir, "user", new Date("2026-06-12T10:02:00.000Z"))?.roots,
+    [second],
+  );
+});
+
 test("uses context only for contextual file requests", () => {
   assert.equal(shouldUseFileContext("这个包里面的 md 文件"), true);
   assert.equal(shouldUseFileContext("把文件发给我手机上"), true);

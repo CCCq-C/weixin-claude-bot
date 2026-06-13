@@ -94,3 +94,20 @@ test("does not treat plain file names as folder roots", async () => {
 
   assert.deepEqual(roots, []);
 });
+
+test("keeps spoken directory cues available after intent cleanup", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-home-"));
+  const parent = path.join(home, "Desktop", "CodeX");
+  const child = path.join(parent, "小黄Html");
+  fs.mkdirSync(child, { recursive: true });
+
+  const intent = parseFileSendIntent("帮我把小黄Html里面的 HTML 发给我");
+  assert.ok(intent);
+
+  const roots = await resolveFileQueryRoots(intent.rawText ?? intent.query, {
+    homeDir: home,
+    roots: [parent],
+  });
+
+  assert.deepEqual(roots, [child]);
+});

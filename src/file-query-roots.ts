@@ -200,7 +200,7 @@ function extractPhraseKeywords(text: string): string[] {
 function cleanPhraseKeyword(phrase: string): string {
   return phrase
     .replace(
-      /桌面|下载|文档|desktop|downloads|documents|文件夹|目录|文件|里面|里的|那个|这个|发我|发给我|发过来|发送|传给我|帮我|我要|我需要|需要|给我|上|下|中|的|包/gi,
+      /桌面|下载|文档|desktop|downloads|documents|文件夹|目录|文件|里面|里的|那个|这个|发我|发给我|发过来|发送|传给我|帮我|我要|我需要|需要|给我|请|把|上|下|中|的|包/gi,
       " ",
     )
     .replace(/\b(md|markdown|pdf|docx?|xlsx?|pptx?|png|jpe?g|mp4|mov)\b/gi, " ")

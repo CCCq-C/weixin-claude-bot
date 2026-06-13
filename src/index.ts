@@ -94,7 +94,9 @@ async function startFileSearch(params: {
 }): Promise<void> {
   const context = readFileContext("data", params.userId);
   let candidates: FileCandidate[] = [];
-  const explicitRoots = await resolveFileQueryRoots(params.intent.query);
+  const explicitRoots = await resolveFileQueryRoots(params.intent.rawText ?? params.intent.query, {
+    roots: context?.roots,
+  });
 
   if (explicitRoots.length > 0) {
     candidates = await findLocalFileCandidates(params.intent, {
