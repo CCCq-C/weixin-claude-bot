@@ -24,9 +24,12 @@ import { acquireInstanceLock } from "./instance-lock.js";
 import { prepareResultDelivery } from "./result-delivery.js";
 import {
   parseFileSelectionReply,
-  parseFileSendIntent,
   type FileSendIntent,
 } from "./file-intent.js";
+import {
+  classifyUserIntentWithClaude,
+  resolveFileIntent,
+} from "./intent-router.js";
 import { findLocalFileCandidates } from "./local-file-finder.js";
 import { resolveFileQueryRoots } from "./file-query-roots.js";
 import {
@@ -361,7 +364,9 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const parsedRefinement = parseFileSendIntent(text);
+      const parsedRefinement = await resolveFileIntent(text, {
+        classifyWithAi: classifyUserIntentWithClaude,
+      });
       if (parsedRefinement) {
         await startFileSearch({
           intent: parsedRefinement,
@@ -376,19 +381,6 @@ async function main(): Promise<void> {
 
       clearPendingFileSend("data", from);
       appendEvent("data", "file-send-dismissed-by-new-message", { from });
-    }
-
-    const fileIntent = parseFileSendIntent(text);
-    if (fileIntent) {
-      await startFileSearch({
-        intent: fileIntent,
-        userId: from,
-        baseUrl: account.baseUrl,
-        botToken: account.botToken,
-        contextToken: ctx,
-      });
-      appendEvent("data", "file-send-search-started", { from });
-      continue;
     }
 
     const command = parseBotCommand(text);
@@ -413,6 +405,21 @@ async function main(): Promise<void> {
       } catch (e: unknown) {
         console.error(`[send] 命令回复失败: ${e instanceof Error ? e.message : e}`);
       }
+      continue;
+    }
+
+    const fileIntent = await resolveFileIntent(text, {
+      classifyWithAi: classifyUserIntentWithClaude,
+    });
+    if (fileIntent) {
+      await startFileSearch({
+        intent: fileIntent,
+        userId: from,
+        baseUrl: account.baseUrl,
+        botToken: account.botToken,
+        contextToken: ctx,
+      });
+      appendEvent("data", "file-send-search-started", { from });
       continue;
     }
 
