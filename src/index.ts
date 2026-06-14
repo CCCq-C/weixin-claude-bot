@@ -49,6 +49,11 @@ import {
   saveFileContextFromText,
   shouldUseFileContext,
 } from "./file-context.js";
+import {
+  appendConversationTurn,
+  readConversationHistory,
+  rootsFromConversationHistory,
+} from "./conversation-history.js";
 
 const WECHAT_CHUNK = 3500; // 单条文本上限保守值
 
@@ -96,9 +101,14 @@ async function startFileSearch(params: {
   contextToken: string;
 }): Promise<void> {
   const context = readFileContext("data", params.userId);
+  const history = readConversationHistory("data", params.userId);
+  const contextRoots = mergeRoots(
+    context?.roots ?? [],
+    rootsFromConversationHistory(history, params.intent.query),
+  );
   let candidates: FileCandidate[] = [];
   const explicitRoots = await resolveFileQueryRoots(params.intent.rawText ?? params.intent.query, {
-    roots: context?.roots,
+    roots: contextRoots,
   });
 
   if (explicitRoots.length > 0) {
@@ -111,17 +121,21 @@ async function startFileSearch(params: {
   }
   if (
     candidates.length === 0 &&
-    context?.roots.length &&
+    contextRoots.length > 0 &&
     shouldUseFileContext(params.intent.query)
   ) {
     candidates = await findLocalFileCandidates(params.intent, {
-      roots: context.roots,
+      roots: contextRoots,
       timeoutMs: 5000,
       maxScanned: 10_000,
       preserveRootOrder: true,
     });
   }
   if (candidates.length === 0) {
+    appendEvent("data", "file-search-context-miss", {
+      from: params.userId,
+      contextRootCount: contextRoots.length,
+    });
     candidates = await findLocalFileCandidates(params.intent);
   }
   if (candidates.length === 0) {
@@ -146,6 +160,17 @@ async function startFileSearch(params: {
     }),
     params.contextToken,
   );
+}
+
+function mergeRoots(...groups: string[][]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const root of groups.flat()) {
+    if (seen.has(root)) continue;
+    seen.add(root);
+    out.push(root);
+  }
+  return out;
 }
 
 async function sendConfirmedFile(params: {
@@ -288,6 +313,7 @@ async function main(): Promise<void> {
     console.log(`[recv] ${from}: ${text}`);
     updateStatus("data", { lastMessageAt: new Date().toISOString() });
     appendEvent("data", "message-received", { from });
+    appendConversationTurn("data", from, { role: "user", content: text });
 
     const pendingFileSend = readPendingFileSend("data", from);
     if (pendingFileSend) {
@@ -462,6 +488,7 @@ async function main(): Promise<void> {
       const elapsed = Math.round((Date.now() - t0) / 1000);
       console.log(`[claude] ${elapsed}s, ${result.length} chars`);
       saveFileContextFromText("data", from, `${text}\n${result}`);
+      appendConversationTurn("data", from, { role: "assistant", content: result });
 
       let resultDelivered = true;
       let chunks: string[];

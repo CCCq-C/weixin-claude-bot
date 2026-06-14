@@ -61,10 +61,29 @@ test("low-confidence or failed AI decisions fall back to deterministic routing",
   );
 });
 
-test("does not call AI router for non-fileish normal chat", () => {
-  assert.equal(shouldAskAiRouter("今天心情怎么样？"), false);
+test("asks AI router for normal chat and fileish messages", () => {
+  assert.equal(shouldAskAiRouter("今天心情怎么样？"), true);
   assert.equal(shouldAskAiRouter("/status"), false);
   assert.equal(shouldAskAiRouter("把桌面那个 Word 发给我"), true);
+});
+
+test("lets AI classify directory listing requests as normal Claude tasks", async () => {
+  let called = false;
+  assert.equal(shouldAskAiRouter("你好，看一下我桌面有啥文件夹"), true);
+
+  const intent = await resolveFileIntent("你好，看一下我桌面有啥文件夹", {
+    classifyWithAi: async () => {
+      called = true;
+      return {
+        route: "normal_task",
+        confidence: 0.95,
+        reason: "user wants Claude to inspect/list a folder, not send an attachment",
+      };
+    },
+  });
+
+  assert.equal(called, true);
+  assert.equal(intent, null);
 });
 
 test("parses Claude JSON wrapper and direct JSON router outputs", () => {
@@ -93,9 +112,10 @@ test("parses Claude JSON wrapper and direct JSON router outputs", () => {
 });
 
 test("router prompt tells AI to keep create-and-save tasks as normal tasks", () => {
-  const prompt = buildIntentRouterPrompt("写一篇文案，整理成 Word 发给我");
+  const prompt = buildIntentRouterPrompt("看一下我桌面有啥文件夹");
 
   assert.match(prompt, /写、生成、创作、整理成 Word\/PPT\/PDF/);
+  assert.match(prompt, /浏览目录|查看文件夹|打开文件夹/);
   assert.match(prompt, /normal_task/);
   assert.match(prompt, /send_existing_file/);
 });

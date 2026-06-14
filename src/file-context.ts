@@ -43,7 +43,7 @@ export function extractFileContextRoots(
   for (const folderName of extractInlineDesktopFolderPaths(text)) {
     roots.add(path.join(homeDir, "Desktop", folderName));
   }
-  if (/桌面|Desktop|文件夹内容|目录内容|文件夹列表|结构如下|根目录|子文件夹|里有\s*\d*\s*个文件/i.test(text)) {
+  if (/桌面|Desktop|文件夹内容|目录内容|文件夹列表|结构如下|内容：|根目录|子文件夹|里有\s*\d*\s*个文件/i.test(text)) {
     for (const folderName of extractDesktopFolderNames(text)) {
       roots.add(path.join(homeDir, "Desktop", folderName));
     }
@@ -60,14 +60,7 @@ export function saveFileContextFromText(
 ): void {
   const now = options.now ?? new Date();
   const previousRoots = readFileContext(dataDir, userId, now)?.roots ?? [];
-  let roots = resolveExistingContextRoots(
-    extractFileContextRoots(text, options),
-    previousRoots,
-  );
-  if (roots.length === 0) {
-    const selectedRoot = resolveOrdinalNavigationRoot(text, previousRoots);
-    if (selectedRoot) roots = [selectedRoot];
-  }
+  const roots = resolveFileContextRootsFromText(text, previousRoots, options);
   if (roots.length === 0) return;
 
   const file = contextFilePath(dataDir, userId);
@@ -77,6 +70,22 @@ export function saveFileContextFromText(
     createdAt: now.toISOString(),
   };
   fs.writeFileSync(file, JSON.stringify(stored, null, 2), "utf-8");
+}
+
+export function resolveFileContextRootsFromText(
+  text: string,
+  previousRoots: string[],
+  options: ExtractContextOptions = {},
+): string[] {
+  let roots = resolveExistingContextRoots(
+    extractFileContextRoots(text, options),
+    previousRoots,
+  );
+  if (roots.length === 0) {
+    const selectedRoot = resolveOrdinalNavigationRoot(text, previousRoots);
+    if (selectedRoot) roots = [selectedRoot];
+  }
+  return roots;
 }
 
 export function readFileContext(

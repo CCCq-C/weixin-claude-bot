@@ -22,9 +22,6 @@ export type ResolveFileIntentOptions = {
 };
 
 const AI_ROUTER_TIMEOUT_MS = 8_000;
-const FILEISH_PATTERN =
-  /发|发送|传|给我|文件|文档|word|docx?|excel|xlsx?|pptx?|pdf|图片|照片|视频|音频|录音|桌面|下载|目录|文件夹|找/i;
-
 const FILE_TYPE_EXTENSIONS: Record<string, string[]> = {
   html: [".html", ".htm"],
   htm: [".html", ".htm"],
@@ -63,11 +60,12 @@ export async function resolveFileIntent(
   options: ResolveFileIntentOptions = {},
 ): Promise<FileSendIntent | null> {
   const deterministic = parseFileSendIntent(text);
-  if (!shouldAskAiRouter(text, deterministic)) return deterministic;
+  if (text.trim().startsWith("/")) return deterministic;
 
   const aiDecision = options.classifyWithAi
     ? await safeClassifyWithAi(options.classifyWithAi, text)
     : null;
+  if (!options.classifyWithAi) return deterministic;
   return applyAiIntentDecision(text, deterministic, aiDecision, options.minConfidence);
 }
 
@@ -76,7 +74,8 @@ export function shouldAskAiRouter(
   deterministic: FileSendIntent | null = parseFileSendIntent(text),
 ): boolean {
   if (text.trim().startsWith("/")) return false;
-  return Boolean(deterministic) || FILEISH_PATTERN.test(text);
+  void deterministic;
+  return text.trim().length > 0;
 }
 
 export function applyAiIntentDecision(
@@ -131,16 +130,18 @@ export function buildIntentRouterPrompt(userText: string): string {
     "你是微信 bot 的意图路由器。只判断用户这句话应该走哪个内部流程。",
     "",
     "可选 route：",
-    "- normal_task：用户要 AI 写作、生成、整理、分析、创建文件、保存文件、执行任务或回答问题。",
+    "- normal_task：用户要 AI 写作、生成、整理、分析、创建文件、保存文件、执行任务、回答问题、浏览目录、查看文件夹、打开文件夹。",
     "- send_existing_file：用户要查找并发送电脑上已经存在的文件。",
     "- search_existing_file：用户只想找/列出电脑上已有文件，尚未明确发送。",
     "- unknown：无法判断。",
     "",
     "关键规则：",
     "1. 如果用户说写、生成、创作、整理成 Word/PPT/PDF、保存到桌面/文件夹，即使出现“发给我”，也必须是 normal_task。",
-    "2. 只有用户要发送已经存在的本地文件时，才是 send_existing_file。",
-    "3. file_query 只写用于本地找文件的关键词，不要写整句。",
-    "4. 只返回 JSON，不要 Markdown，不要解释。",
+    "2. 如果用户只是想看桌面/下载/某个文件夹里有什么，或者让 AI 打开文件夹看看，这是 normal_task，不是 search_existing_file。",
+    "3. 只有用户要把电脑上已经存在的文件作为微信附件发回来时，才是 send_existing_file。",
+    "4. 如果用户只是要找已有文件但没有说发送，才是 search_existing_file。",
+    "5. file_query 只写用于本地找文件的关键词，不要写整句。",
+    "6. 只返回 JSON，不要 Markdown，不要解释。",
     "",
     "JSON 格式：",
     '{"route":"normal_task|send_existing_file|search_existing_file|unknown","confidence":0.0,"file_query":"","file_types":[],"reason":""}',
