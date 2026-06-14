@@ -38,6 +38,23 @@ test("does not trap normal folder or task requests as file sending", () => {
   assert.equal(parseFileSendIntent("帮我执行一下刚才那个整理任务"), null);
 });
 
+test("does not treat create-and-save document tasks as file sending", () => {
+  assert.equal(
+    parseFileSendIntent(
+      "帮我以金枪大叔的口吻，写3篇关于AI应用的口播文案，每篇300字左右。发给我，同时整理成WORD文档，存桌面的，存放在“智能体”这个文件夹",
+    ),
+    null,
+  );
+  assert.equal(parseFileSendIntent("请生成一份 Word 文档并保存到桌面"), null);
+});
+
+test("still treats existing document requests as file sending", () => {
+  const intent = parseFileSendIntent("把桌面智能体文件夹里的 Word 文档发给我");
+
+  assert.equal(intent?.kind, "send");
+  assert.deepEqual(intent?.extensions, [".doc", ".docx"]);
+});
+
 test("detects search-only file requests and maps file type words", () => {
   const intent = parseFileSendIntent("找一下那个 PPT");
 
