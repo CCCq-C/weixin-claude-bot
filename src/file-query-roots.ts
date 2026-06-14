@@ -1,11 +1,7 @@
-import { execFile } from "node:child_process";
-import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { isUnderRoot, runMdfind, walkDirectoryTree } from "./fs-walk.js";
 
 export type ResolveFileQueryRootsOptions = {
   homeDir?: string;
@@ -19,33 +15,6 @@ type ScoredDirectory = {
   score: number;
   baseIndex: number;
 };
-
-const EXCLUDED_DIR_NAMES = new Set([
-  ".git",
-  ".Trash",
-  ".cache",
-  ".npm",
-  ".pnpm-store",
-  "__pycache__",
-  "node_modules",
-  "Library",
-  "AppData",
-  "Windows",
-  "System Volume Information",
-  "$Recycle.Bin",
-]);
-
-const EXCLUDED_ABSOLUTE_PREFIXES = [
-  "/System",
-  "/Library",
-  "/Applications",
-  "/usr",
-  "/bin",
-  "/sbin",
-  "/private",
-  "/dev",
-  "/proc",
-];
 
 const LOCATION_ROOTS: Array<{ pattern: RegExp; folder: string }> = [
   { pattern: /桌面|desktop/i, folder: "Desktop" },
@@ -214,38 +183,20 @@ async function scanDirectoryRoots(
   timeoutMs: number,
   maxScanned: number,
 ): Promise<string[]> {
-  const startedAt = Date.now();
   const matches: string[] = [];
-  let scanned = 0;
 
-  async function scanDir(dir: string): Promise<void> {
-    if (Date.now() - startedAt > timeoutMs || scanned >= maxScanned) return;
-    if (shouldSkipPath(dir)) return;
-
-    let entries: Array<import("node:fs").Dirent>;
-    try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      if (Date.now() - startedAt > timeoutMs || scanned >= maxScanned) return;
-      if (!entry.isDirectory()) continue;
-      const fullPath = path.join(dir, entry.name);
-      if (shouldSkipPath(fullPath, entry.name)) continue;
-      scanned += 1;
-
+  await walkDirectoryTree({
+    roots: baseRoots,
+    timeoutMs,
+    maxScanned,
+    countEntry: ({ entry }) => entry.isDirectory(),
+    onEntry({ path: fullPath, entry }) {
+      if (!entry.isDirectory()) return;
       if (directoryNameMatches(entry.name, keywords)) {
         matches.push(fullPath);
       }
-      await scanDir(fullPath);
-    }
-  }
-
-  for (const root of baseRoots) {
-    await scanDir(root);
-  }
+    },
+  });
   return matches;
 }
 
@@ -258,13 +209,12 @@ async function findDirectoriesWithMdfind(
   for (const keyword of keywords) {
     for (const root of baseRoots) {
       try {
-        const { stdout } = await execFileAsync("/usr/bin/mdfind", ["-onlyin", root, "-name", keyword], {
-          timeout: Math.max(500, Math.min(timeoutMs, 3000)),
-          maxBuffer: 1024 * 1024,
-        });
-        for (const line of stdout.split("\n")) {
-          const candidate = line.trim();
-          if (candidate && isDirectory(candidate) && !shouldSkipPath(candidate)) {
+        const paths = await runMdfind(
+          ["-onlyin", root, "-name", keyword],
+          Math.max(500, Math.min(timeoutMs, 3000)),
+        );
+        for (const candidate of paths) {
+          if (candidate && isDirectory(candidate)) {
             matches.push(candidate);
           }
         }
@@ -317,24 +267,12 @@ function rankDirectories(
     .map(({ dir }) => dir);
 }
 
-function shouldSkipPath(filePath: string, leafName = path.basename(filePath)): boolean {
-  if (EXCLUDED_DIR_NAMES.has(leafName)) return true;
-  return EXCLUDED_ABSOLUTE_PREFIXES.some(
-    (prefix) => filePath === prefix || filePath.startsWith(`${prefix}/`),
-  );
-}
-
 function isDirectory(filePath: string): boolean {
   try {
     return fsSync.statSync(filePath).isDirectory();
   } catch {
     return false;
   }
-}
-
-function isUnderRoot(filePath: string, root: string): boolean {
-  const relative = path.relative(root, filePath);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function dedupe(values: string[]): string[] {

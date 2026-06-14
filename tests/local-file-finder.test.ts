@@ -37,6 +37,23 @@ test("skips noisy directories while scanning", async () => {
   assert.equal(candidates.length, 0);
 });
 
+test("skips package manager cache directories while scanning", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-files-"));
+  const npmCache = path.join(dir, ".npm");
+  const pnpmStore = path.join(dir, ".pnpm-store");
+  fs.mkdirSync(npmCache);
+  fs.mkdirSync(pnpmStore);
+  fs.writeFileSync(path.join(npmCache, "secret-token.txt"), "npm");
+  fs.writeFileSync(path.join(pnpmStore, "secret-token.txt"), "pnpm");
+
+  const candidates = await findLocalFileCandidates(
+    { query: "secret token", extensions: [".txt"], kind: "send" },
+    { roots: [dir], now: new Date("2026-06-12T12:00:00.000Z") },
+  );
+
+  assert.equal(candidates.length, 0);
+});
+
 test("returns an absolute file path directly", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-files-"));
   const file = path.join(dir, "demo.pdf");
