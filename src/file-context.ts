@@ -43,7 +43,7 @@ export function extractFileContextRoots(
   for (const folderName of extractInlineDesktopFolderPaths(text)) {
     roots.add(path.join(homeDir, "Desktop", folderName));
   }
-  if (/桌面|Desktop|文件夹内容|目录内容|里有\s*\d*\s*个文件/i.test(text)) {
+  if (/桌面|Desktop|文件夹内容|目录内容|文件夹列表|结构如下|根目录|子文件夹|里有\s*\d*\s*个文件/i.test(text)) {
     for (const folderName of extractDesktopFolderNames(text)) {
       roots.add(path.join(homeDir, "Desktop", folderName));
     }
@@ -127,7 +127,7 @@ function extractDesktopFolderNames(text: string): string[] {
     }
 
     const folderName = extractFolderNameFromListingLine(line);
-    if (!folderName || folderName.startsWith(".")) continue;
+    if (!folderName || !isUsableFolderName(folderName)) continue;
 
     if (/文件夹内容|目录内容/.test(line)) {
       parentFolder = folderName;
@@ -146,7 +146,7 @@ function extractInlineDesktopFolderPaths(text: string): string[] {
     /(?:^|[\s`，。；;：:、])`?([\p{Script=Han}A-Za-z0-9._:-]+(?:\/[\p{Script=Han}A-Za-z0-9._:-]+)+)\/`?/gu;
   for (const match of text.matchAll(inlinePathPattern)) {
     const value = match[1]?.trim();
-    if (!value || value.startsWith(".")) continue;
+    if (!isUsableFolderName(value)) continue;
     paths.add(value);
   }
   return [...paths];
@@ -158,6 +158,10 @@ function extractFolderNameFromListingLine(line: string): string | null {
   );
   const name = match?.[1]?.trim();
   return name || null;
+}
+
+function isUsableFolderName(name: string): boolean {
+  return name.length > 0 && name !== "." && name !== "..";
 }
 
 function resolveExistingContextRoots(rawRoots: string[], previousRoots: string[]): string[] {

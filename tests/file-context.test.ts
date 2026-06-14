@@ -234,3 +234,55 @@ test("searches files inside an inline nested folder context", async () => {
 
   assert.equal(candidates[0].path, file);
 });
+
+test("narrows context to dot-prefixed plugin folder from Claude structure output", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wcb-context-"));
+  const home = path.join(dir, "home");
+  const desktop = path.join(home, "Desktop");
+  const codex = path.join(desktop, "CodeX");
+  const obsidian = path.join(desktop, "obsidian-skills-main");
+  const pluginDir = path.join(obsidian, ".claude-plugin");
+  const noisyDir = path.join(codex, "ai-status-light", "target", "release", "deps");
+  fs.mkdirSync(pluginDir, { recursive: true });
+  fs.mkdirSync(noisyDir, { recursive: true });
+  fs.writeFileSync(path.join(pluginDir, "plugin.json"), "{}");
+  fs.writeFileSync(path.join(pluginDir, "marketplace.json"), "{}");
+  fs.writeFileSync(path.join(noisyDir, "libtauri_plugin_opener.rlib"), "noise");
+
+  saveFileContextFromText(
+    dir,
+    "user",
+    [
+      "跟之前差不多，文件夹列表：",
+      "• `CodeX/` — CodeX 项目",
+      "• `obsidian-skills-main/` — Obsidian skills",
+    ].join("\n"),
+    { homeDir: home, now: new Date("2026-06-12T10:00:00.000Z") },
+  );
+  saveFileContextFromText(
+    dir,
+    "user",
+    [
+      "那个 obsidian 文件夹里面是啥",
+      "这是一个 Obsidian Claude 插件包，结构如下：",
+      "`.claude-plugin/` — 插件配置",
+      "• `plugin.json` + `marketplace.json`",
+      "`skills/` — 5 个 Obsidian 相关 skill",
+    ].join("\n"),
+    { homeDir: home, now: new Date("2026-06-12T10:01:00.000Z") },
+  );
+
+  const context = readFileContext(dir, "user", new Date("2026-06-12T10:02:00.000Z"));
+  assert.ok(context?.roots.includes(pluginDir));
+
+  const candidates = await findLocalFileCandidates(
+    { kind: "send", query: "plugin", extensions: [] },
+    {
+      roots: context?.roots ?? [],
+      now: new Date("2026-06-12T10:02:00.000Z"),
+      preserveRootOrder: true,
+    },
+  );
+
+  assert.equal(candidates[0].path, path.join(pluginDir, "plugin.json"));
+});
