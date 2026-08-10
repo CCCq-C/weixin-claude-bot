@@ -483,4 +483,4 @@ This project is open-sourced under the MIT License. You may use, copy, modify, d
 
 如果想要深入学习、研究或者交流，可以扫描下方二维码添加我。
 
-![微信二维码](./contact-qr.png)
+<img src="./contact-qr.png" alt="微信二维码" width="269" height="269">
