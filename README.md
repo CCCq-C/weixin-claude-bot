@@ -476,3 +476,11 @@ npm run typecheck
 本项目使用 MIT License 开源。你可以自由使用、复制、修改、分发和商用本项目，但需要保留原始版权声明和协议文本。
 
 This project is open-sourced under the MIT License. You may use, copy, modify, distribute, and use it commercially, as long as the original copyright notice and license text are preserved.
+
+---
+
+## 深入学习与交流
+
+如果想要深入学习、研究或者交流，可以扫描下方二维码添加我。
+
+![微信二维码](./contact-qr.png)
